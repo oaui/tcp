@@ -1,5 +1,3 @@
-// SYN Flood - Bennett
-
 #include <unistd.h>
 #include <time.h>
 #include <sys/types.h>
