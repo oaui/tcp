@@ -205,7 +205,7 @@ void setup_tcpopts_header(struct tcpOptions *opts)
 	opts->nop_nouse2 = 0x01;
 	opts->nop_nouse3 = 0x01;
 	opts->msskind = 0x02;
-	opts->mssvalue = htons(1460);
+	opts->mssvalue = 0x5B4;
 	opts->msslen = 0x04;
 	opts->wskind = 0x03;
 	opts->wslen = 0x03;
