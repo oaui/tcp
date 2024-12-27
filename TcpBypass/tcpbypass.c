@@ -138,7 +138,7 @@ void setup_ip_header(struct iphdr *iph)
 	iph->ttl = MAXTTL;
 	iph->protocol = IPPROTO_TCP;
 	iph->check = 0;
-	iph->saddr = inet_addr("0.0.0.0");
+	iph->saddr = inet_addr("127.0.0.1");
 }
 
 void setup_tcp_header(struct tcphdr *tcph)
