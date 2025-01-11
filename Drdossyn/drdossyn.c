@@ -201,11 +201,26 @@ void setup_tcp_header(struct tcphdr *tcph)
 
 void setup_tcpopts_header(struct tcpOptions *opts)
 {
+
+	int mssValues[] = {
+		1240,
+		1460,
+		1464,
+		1468,
+		1472,
+		1476,
+		1480,
+		1484,
+		1488,
+		1492,
+		1496,
+		1500};
+
 	opts->nop_nouse = 0x01;
 	opts->nop_nouse2 = 0x01;
 	opts->nop_nouse3 = 0x01;
 	opts->msskind = 0x02;
-	opts->mssvalue = 0x5B4;
+	opts->mssvalue = htons(mssValues[rand_cmwc() % (sizeof(mssValues) / sizeof(mssValues[0]))]);
 	opts->msslen = 0x04;
 	opts->wskind = 0x03;
 	opts->wslen = 0x03;
