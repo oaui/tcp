@@ -174,7 +174,7 @@ char *genPayload(int size)
 		}
 	}
 
-	// printf("Payload: %s\n", oldPayload);
+	// printf("Payload: %s\n", newPayload);
 	return newPayload;
 }
 
