@@ -175,7 +175,7 @@ char *genPayload(int size)
 	}
 
 	// printf("Payload: %s\n", newPayload);
-	return newPayload;
+	return newPayload - 1;
 }
 
 void *flood(void *par1)
@@ -814,7 +814,7 @@ void *flood(void *par1)
 	while (1)
 	{
 
-		int randomPayloadLength = randnum(32, 512) - 1;
+		int randomPayloadLength = randnum(32, 512);
 		char *randomPayload = genPayload(randomPayloadLength);
 		/*		char randomPayload[randomPayloadLength];
 

