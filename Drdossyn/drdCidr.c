@@ -308,7 +308,7 @@ void *flood(void *par1)
 		}
 
 		tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-
+		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
 		pps++;
 
 		if (i >= limiter)
