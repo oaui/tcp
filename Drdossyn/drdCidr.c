@@ -199,6 +199,7 @@ void setup_tcp_header(struct tcphdr *tcph)
 	tcph->urg_ptr = 0;
 	tcph->window = 8192;
 	tcph->check = 0;
+	tcph->ack_seq = 0;
 }
 
 void setup_tcpopts_header(struct tcpOptions *opts)
