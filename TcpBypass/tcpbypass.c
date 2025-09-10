@@ -162,26 +162,7 @@ char *generatePayload(int size)
 
 	for (int i = 0; i < size; i++)
 	{
-		if (i % 5 == 0)
-		{
-			payload[i] = randnum(1, 256);
-		}
-		else
-		{
-			payload[i] = rand_cmwc() % 256;
-		}
-		if (randnum(0, 1) == 0)
-		{
-			for (int j = i; j < i + 4; j++)
-			{
-				payload[i] = 0xFF;
-			}
-			i += 4;
-		}
-		else
-		{
-			continue;
-		}
+		payload[i] = rand_cmwc() % 256;
 	}
 	return payload;
 }

