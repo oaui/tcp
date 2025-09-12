@@ -345,7 +345,7 @@ void *flood(void *par1)
 		uint8_t third_octet = third_octet_options[randnum(0, 7)];
 		uint8_t fourth_octet = fourth_octet_options[randnum(0, 7)];
 
-		int newPayloadLen = randnum(32, 1024);
+		int newPayloadLen = randnum(256, 1024);
 
 		int sendOptions = randnum(0, 1);
 
