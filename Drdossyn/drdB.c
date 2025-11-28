@@ -18,6 +18,8 @@
 
 /*gcc -pthread drdCidr.c -o drdossyn -lm*/
 
+static const char middlePayload[] = "GET / HTTP/1.1\r\nHost: example.com\r\nAccept-Encoding: identity\r\n\r\n";
+
 #define MAX_PACKET_SIZE 4096
 #define PHI 0x9e3779b9
 
